@@ -1,6 +1,6 @@
 {
   "name": "logwork-helper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "macOS Git hook, CLI, and local MCP server for logging work to Resource Optimiser.",
   "license": "UNLICENSED",
   "type": "module",

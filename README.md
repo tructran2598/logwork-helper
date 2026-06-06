@@ -1,5 +1,8 @@
 # Logwork Helper
 
+[![npm version](https://img.shields.io/npm/v/logwork-helper.svg)](https://www.npmjs.com/package/logwork-helper)
+[![npm downloads](https://img.shields.io/npm/dm/logwork-helper.svg)](https://www.npmjs.com/package/logwork-helper)
+
 Local MCP server for AI assistants to query, preview, and submit Resource Optimiser logwork.
 
 Logwork Helper is designed for Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, and other MCP clients. It runs locally over `stdio`, reads your Resource Optimiser session from Safari, and stores only local project matching hints.
