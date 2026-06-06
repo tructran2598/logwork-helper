@@ -23,9 +23,17 @@ test('MCP server lists logwork tools over stdio', async () => {
     await client.connect(transport);
     const result = await client.listTools();
     const names = result.tools.map((tool) => tool.name).sort();
-    assert.deepEqual(names, ['apply_logwork_batch', 'preview_logwork_batch', 'query_logwork']);
+    assert.deepEqual(names, [
+      'apply_logwork_batch',
+      'list_logwork_projects',
+      'preview_logwork_batch',
+      'query_logwork',
+      'upsert_project_mapping'
+    ]);
     const applyTool = result.tools.find((tool) => tool.name === 'apply_logwork_batch');
     assert.equal(applyTool.inputSchema.properties.allowUnbooked.type, 'boolean');
+    const setupTool = result.tools.find((tool) => tool.name === 'upsert_project_mapping');
+    assert.equal(setupTool.inputSchema.properties.confirm.type, 'boolean');
     const queryTool = result.tools.find((tool) => tool.name === 'query_logwork');
     assert.deepEqual(queryTool.inputSchema.properties.period.enum, ['today', 'this_week']);
 

@@ -9,6 +9,10 @@ import {
   formatToolResponse,
   previewLogworkBatch
 } from './lib/batch-workflow.mjs';
+import {
+  listLogworkProjects,
+  upsertProjectMapping
+} from './lib/project-mapping-workflow.mjs';
 import { queryLogwork } from './lib/query-workflow.mjs';
 
 const PREVIEW_TTL_MS = 60 * 60 * 1000;
@@ -80,6 +84,34 @@ server.registerTool('query_logwork', {
     period,
     project,
     includeEntries
+  });
+  return formatToolResponse(result);
+});
+
+server.registerTool('list_logwork_projects', {
+  description: 'List Resource Optimiser project memberships and current local logwork project mappings without changing data.',
+  inputSchema: {}
+}, async () => {
+  const result = await listLogworkProjects();
+  return formatToolResponse(result);
+});
+
+server.registerTool('upsert_project_mapping', {
+  description: 'Create or update a local ticket/keyword-to-project mapping after explicit user approval.',
+  inputSchema: {
+    projectMemberId: z.union([z.string(), z.number()]).optional().describe('Resource Optimiser project_member_id chosen from list_logwork_projects or preview setupSuggestions.'),
+    projectName: z.string().optional().describe('Project name to match against user project memberships when projectMemberId is not provided.'),
+    tickets: z.array(z.string()).min(1).describe('Ticket prefixes to map, for example ["SCB"].'),
+    keywords: z.array(z.string()).optional().describe('Optional task keywords to map to the project.'),
+    confirm: z.boolean().describe('Must be true after explicit user approval because this writes .logwork-helper.json.')
+  }
+}, async ({ projectMemberId, projectName, tickets, keywords = [], confirm }) => {
+  const result = await upsertProjectMapping({
+    projectMemberId,
+    projectName,
+    tickets,
+    keywords,
+    confirm
   });
   return formatToolResponse(result);
 });

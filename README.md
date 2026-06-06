@@ -154,11 +154,13 @@ Open workspace `.vscode/mcp.json` or the VS Code user MCP configuration and add:
 
 Equivalent template: `examples/mcp/copilot.mcp.json`.
 
-The MCP server exposes three tools:
+The MCP server exposes five tools:
 
 - `preview_logwork_batch`: parses a weekly text block, resolves booked projects by date, and returns a human-readable preview plus structured JSON. If a task is not booked that day but matches a project membership through `.logwork-helper.json`, it is returned as `resolved_unbooked`.
 - `apply_logwork_batch`: submits an approved preview. It requires `confirm: true` and refuses to run while entries are unresolved. Entries with `resolved_unbooked` require an additional `allowUnbooked: true` flag.
 - `query_logwork`: checks booked/logged work by date, range, period, and optional project filter without changing data. It fetches task-level log details from `/member-logtime` when entries are requested.
+- `list_logwork_projects`: lists your Resource Optimiser project memberships and current local project mappings.
+- `upsert_project_mapping`: creates or updates a local ticket/keyword mapping after explicit approval with `confirm: true`.
 
 Supported weekly text format:
 
@@ -170,21 +172,41 @@ Tuesday, 02 Jun 2026
 +2.5 Password reset validation and UI improvements (SCB-228)
 ```
 
-Optional project matching config can be placed in the MCP client's working directory as `.logwork-helper.json`:
+MCP can generate or update project matching config for you. When preview cannot resolve a ticket like `SCB-213`, choose a project from `list_logwork_projects`, then call `upsert_project_mapping`:
+
+```json
+{
+  "projectMemberId": 5234,
+  "tickets": ["SCB"],
+  "keywords": ["question bank", "programme", "cluster"],
+  "confirm": true
+}
+```
+
+This creates or updates `.logwork-helper.json` in the MCP server `cwd`:
 
 ```json
 {
   "projectMappings": [
     {
-      "projectName": "Course Builder",
+      "projectName": "2621A-SIT-HTML BUILDER-PRJ",
+      "projectMemberId": 5234,
       "tickets": ["SCB"],
-      "keywords": ["question bank", "programme"]
+      "keywords": ["question bank", "programme", "cluster"]
     }
   ]
 }
 ```
 
-The config is only for project matching hints. Do not store Resource Optimiser tokens in it.
+The config is only for project matching hints. MCP never stores Resource Optimiser tokens in it.
+
+Mapping setup flow:
+
+1. Run `preview_logwork_batch`.
+2. If the preview is unresolved, inspect `setupSuggestions`.
+3. Run `list_logwork_projects` if you want to see all project candidates.
+4. After user approval, run `upsert_project_mapping`.
+5. Run `preview_logwork_batch` again.
 
 Unbooked MCP logwork flow:
 
@@ -208,7 +230,7 @@ MCP troubleshooting:
 - Restart or reload the MCP client after changing config.
 - If a client does not show `query_logwork` or `allowUnbooked`, reset/reload its MCP tool cache.
 - Keep `cwd` pointed at the `logwork-helper` repo so `.logwork-helper.json` is resolved consistently.
-- Do not paste Resource Optimiser Bearer tokens into MCP config; auth is still read from Safari localStorage.
+- Do not paste Resource Optimiser Bearer tokens into MCP config or `.logwork-helper.json`; auth is still read from Safari localStorage.
 
 ## Dry Run
 

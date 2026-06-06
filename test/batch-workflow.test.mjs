@@ -48,6 +48,29 @@ test('buildLogworkBatchPreview marks mapped membership without booking as ready_
   assert.match(preview.summary, /UNBOOKED: \+2h/);
 });
 
+test('buildLogworkBatchPreview suggests mapping setup for unresolved ticket entries', () => {
+  const unbookedParsed = parseWeeklyLogText(`Monday, 01 Jun 2026
++2 Maintenance mode management and status UI (SCB-213)`.replace('++', '+'));
+  const preview = buildLogworkBatchPreview({
+    parsed: unbookedParsed,
+    projectsByDate: new Map([['2026-06-01', []]]),
+    membershipProjects: [
+      { projectMemberId: 5234, projectId: 643, projectName: '2621A-SIT-HTML BUILDER-PRJ' }
+    ]
+  });
+
+  assert.equal(preview.status, 'unresolved');
+  assert.equal(preview.setupSuggestions.length, 1);
+  assert.equal(preview.setupSuggestions[0].ticketPrefixes[0], 'SCB');
+  assert.deepEqual(preview.setupSuggestions[0].candidateProjects[0].toolArguments, {
+    projectMemberId: 5234,
+    tickets: ['SCB'],
+    keywords: [],
+    confirm: true
+  });
+  assert.match(preview.summary, /upsert_project_mapping/);
+});
+
 test('applyLogworkBatch requires confirm true', async () => {
   const preview = buildLogworkBatchPreview({ parsed, projectsByDate });
 
