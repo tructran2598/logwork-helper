@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "logworkHelper": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/absolute/path/to/logwork-helper/mcp-server.mjs"],
+      "cwd": "/absolute/path/to/logwork-helper"
+    }
+  }
+}
