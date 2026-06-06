@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import {
+  getCachedPreview,
+  setCachedPreview
+} from '../mcp-server.mjs';
 
 test('MCP server lists logwork tools over stdio', async () => {
   const client = new Client({
@@ -36,4 +40,21 @@ test('MCP server lists logwork tools over stdio', async () => {
   } finally {
     await client.close();
   }
+});
+
+test('MCP preview cache expires old previews and caps stored batches', () => {
+  const cache = new Map();
+  const now = 1_000;
+
+  setCachedPreview(cache, { batchId: 'expired' }, now);
+  assert.equal(getCachedPreview(cache, 'expired', now + 60 * 60 * 1000), null);
+  assert.equal(cache.has('expired'), false);
+
+  for (let index = 0; index < 101; index += 1) {
+    setCachedPreview(cache, { batchId: `batch-${index}` }, now);
+  }
+
+  assert.equal(cache.size, 100);
+  assert.equal(getCachedPreview(cache, 'batch-0', now), null);
+  assert.deepEqual(getCachedPreview(cache, 'batch-100', now), { batchId: 'batch-100' });
 });

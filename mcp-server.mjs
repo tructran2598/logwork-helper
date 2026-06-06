@@ -2,6 +2,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import {
   applyLogworkBatch,
@@ -10,6 +11,8 @@ import {
 } from './lib/batch-workflow.mjs';
 import { queryLogwork } from './lib/query-workflow.mjs';
 
+const PREVIEW_TTL_MS = 60 * 60 * 1000;
+const MAX_PREVIEWS = 100;
 const previews = new Map();
 
 const server = new McpServer({
@@ -25,8 +28,9 @@ server.registerTool('preview_logwork_batch', {
     projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Map preview entry id to projectMemberId.')
   }
 }, async ({ text, projectOverrides = {} }) => {
+  prunePreviewCache(previews);
   const preview = await previewLogworkBatch({ text, projectOverrides });
-  previews.set(preview.batchId, preview);
+  setCachedPreview(previews, preview);
   return formatToolResponse(preview);
 });
 
@@ -40,7 +44,8 @@ server.registerTool('apply_logwork_batch', {
     projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Final map from preview entry id to projectMemberId.')
   }
 }, async ({ batchId, batch, confirm, allowUnbooked = false, projectOverrides = {} }) => {
-  const approvedBatch = batch || previews.get(batchId);
+  prunePreviewCache(previews);
+  const approvedBatch = batch || getCachedPreview(previews, batchId);
   if (!approvedBatch) {
     throw new Error('Missing approved batch. Pass batchId from preview_logwork_batch or the full structured batch.');
   }
@@ -51,6 +56,9 @@ server.registerTool('apply_logwork_batch', {
     allowUnbooked,
     projectOverrides
   });
+  if (batchId) {
+    previews.delete(batchId);
+  }
   return formatToolResponse(result);
 });
 
@@ -81,7 +89,52 @@ async function main() {
   await server.connect(transport);
 }
 
-main().catch((error) => {
-  console.error('Logwork Helper MCP server error:', error);
-  process.exit(1);
-});
+if (isMainModule()) {
+  main().catch((error) => {
+    console.error('Logwork Helper MCP server error:', error);
+    process.exit(1);
+  });
+}
+
+export function setCachedPreview(cache, preview, now = Date.now()) {
+  prunePreviewCache(cache, now);
+  cache.set(preview.batchId, {
+    preview,
+    expiresAt: now + PREVIEW_TTL_MS
+  });
+  prunePreviewCache(cache, now);
+}
+
+export function getCachedPreview(cache, batchId, now = Date.now()) {
+  const cached = cache.get(batchId);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= now) {
+    cache.delete(batchId);
+    return null;
+  }
+
+  return cached.preview;
+}
+
+export function prunePreviewCache(cache, now = Date.now()) {
+  for (const [batchId, cached] of cache.entries()) {
+    if (cached.expiresAt <= now) {
+      cache.delete(batchId);
+    }
+  }
+
+  while (cache.size > MAX_PREVIEWS) {
+    const oldestBatchId = cache.keys().next().value;
+    if (oldestBatchId === undefined) {
+      break;
+    }
+    cache.delete(oldestBatchId);
+  }
+}
+
+function isMainModule() {
+  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+}

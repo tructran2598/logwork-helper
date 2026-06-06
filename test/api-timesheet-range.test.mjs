@@ -256,3 +256,27 @@ test('normalizeLogtimeEntries returns sanitized task entries', () => {
     }
   ]);
 });
+
+test('normalizeTimesheetRange avoids Project undefined fallback names', () => {
+  const records = normalizeTimesheetRange([
+    {
+      date: '2026-06-01',
+      project_member_id: 5234,
+      bookedHours: 8,
+      loggedHours: 2,
+      logs: [
+        {
+          id: 1,
+          logtimes: 2,
+          task_name: 'Fallback project name task'
+        }
+      ]
+    }
+  ], {
+    from: '2026-06-01',
+    to: '2026-06-02'
+  });
+
+  assert.equal(records[0].projectName, 'Project 5234');
+  assert.equal(records[0].entries[0].projectName, 'Project 5234');
+});

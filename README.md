@@ -154,7 +154,7 @@ Open workspace `.vscode/mcp.json` or the VS Code user MCP configuration and add:
 
 Equivalent template: `examples/mcp/copilot.mcp.json`.
 
-The MCP server exposes two tools:
+The MCP server exposes three tools:
 
 - `preview_logwork_batch`: parses a weekly text block, resolves booked projects by date, and returns a human-readable preview plus structured JSON. If a task is not booked that day but matches a project membership through `.logwork-helper.json`, it is returned as `resolved_unbooked`.
 - `apply_logwork_batch`: submits an approved preview. It requires `confirm: true` and refuses to run while entries are unresolved. Entries with `resolved_unbooked` require an additional `allowUnbooked: true` flag.

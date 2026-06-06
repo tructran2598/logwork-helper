@@ -111,3 +111,39 @@ test('resolveEntryProject rejects override missing from bookings and memberships
   assert.equal(result.status, 'unresolved');
   assert.equal(result.reason, 'override_not_found');
 });
+
+test('resolveEntryProject keeps booked flags and deduplicates invalid override candidates', () => {
+  const result = resolveEntryProject({
+    entry,
+    projects: [
+      { projectMemberId: 1, projectId: 10, projectName: 'Booked Project' }
+    ],
+    membershipProjects: [
+      { projectMemberId: 1, projectId: 10, projectName: 'Booked Project' },
+      { projectMemberId: 2, projectId: 20, projectName: 'Membership Project' }
+    ],
+    projectOverrides: {
+      [entry.id]: 9999
+    }
+  });
+
+  assert.equal(result.status, 'unresolved');
+  assert.deepEqual(result.candidates, [
+    {
+      projectMemberId: 1,
+      projectId: 10,
+      projectName: 'Booked Project',
+      booked: true,
+      confidence: 0,
+      source: 'none'
+    },
+    {
+      projectMemberId: 2,
+      projectId: 20,
+      projectName: 'Membership Project',
+      booked: false,
+      confidence: 0,
+      source: 'none'
+    }
+  ]);
+});
