@@ -9,16 +9,20 @@
   "bin": {
     "logwork-helper-install": "./install.mjs",
     "logwork-helper": "./logwork-helper.mjs",
-    "logwork-helper-manual": "./manual-log.mjs"
+    "logwork-helper-manual": "./manual-log.mjs",
+    "logwork-helper-mcp": "./mcp-server.mjs"
   },
   "scripts": {
     "install-hook": "node install.mjs",
     "log": "node manual-log.mjs",
     "log:dry-run": "LOGWORK_DRY_RUN=1 node manual-log.mjs",
     "start": "node logwork-helper.mjs",
-    "dry-run": "LOGWORK_DRY_RUN=1 node logwork-helper.mjs"
+    "dry-run": "LOGWORK_DRY_RUN=1 node logwork-helper.mjs",
+    "test": "node --test"
   },
   "dependencies": {
-    "@clack/prompts": "^1.5.0"
+    "@clack/prompts": "^1.5.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
   }
 }
