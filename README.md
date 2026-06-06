@@ -30,7 +30,7 @@ Logwork Helper is designed for Cursor, Codex, Google Antigravity, GitHub Copilot
 6. Ask your AI assistant:
 
 ```text
- double check log work this week
+Check my logwork for this week.
 ```
 
 ## Requirements
@@ -157,21 +157,21 @@ Templates are also available in `examples/mcp/`.
 Use these prompts after your IDE sees `logwork-helper`:
 
 ```text
-kiểm tra log work tuần này
+Check my logwork for this week.
 ```
 
 ```text
-repo này đang logwork cho dự án nào trên RO
+Which Resource Optimiser project should this repo log work to?
 ```
 
 ```text
-preview logwork sau rồi hỏi tôi trước khi submit:
+Preview this logwork and ask for my approval before submitting:
 Monday, 01 Jun 2026
 +2 Maintenance mode management and status UI (SCB-213)
 ```
 
 ```text
-setup mapping SCB vào project 2621A-SIT-HTML BUILDER-PRJ
+Set up the SCB ticket mapping to project 2621A-SIT-HTML BUILDER-PRJ.
 ```
 
 ## Common Workflows
@@ -181,11 +181,11 @@ setup mapping SCB vào project 2621A-SIT-HTML BUILDER-PRJ
 Ask your assistant:
 
 ```text
-kiểm tra hôm nay tôi đã log gì chưa
+Check whether I have logged anything today.
 ```
 
 ```text
-trong tuần này tôi đã log work ngày nào và cho dự án nào, liệt kê chi tiết
+List the days and projects I logged work for this week, including task details.
 ```
 
 The assistant should call `query_logwork`. This is read-only and does not need confirmation.
