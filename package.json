@@ -7,12 +7,14 @@
     "node": ">=20"
   },
   "bin": {
+    "logwork-helper-setup-user": "./install-user.mjs",
     "logwork-helper-install": "./install.mjs",
     "logwork-helper": "./logwork-helper.mjs",
     "logwork-helper-manual": "./manual-log.mjs",
     "logwork-helper-mcp": "./mcp-server.mjs"
   },
   "scripts": {
+    "setup-user": "node install-user.mjs",
     "install-hook": "node install.mjs",
     "log": "node manual-log.mjs",
     "log:dry-run": "LOGWORK_DRY_RUN=1 node manual-log.mjs",

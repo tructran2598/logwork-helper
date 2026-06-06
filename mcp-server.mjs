@@ -103,14 +103,16 @@ server.registerTool('upsert_project_mapping', {
     projectName: z.string().optional().describe('Project name to match against user project memberships when projectMemberId is not provided.'),
     tickets: z.array(z.string()).min(1).describe('Ticket prefixes to map, for example ["SCB"].'),
     keywords: z.array(z.string()).optional().describe('Optional task keywords to map to the project.'),
+    scope: z.enum(['user', 'project']).optional().describe('Where to write the mapping. Defaults to user: ~/.logwork-helper/.logwork-helper.json.'),
     confirm: z.boolean().describe('Must be true after explicit user approval because this writes .logwork-helper.json.')
   }
-}, async ({ projectMemberId, projectName, tickets, keywords = [], confirm }) => {
+}, async ({ projectMemberId, projectName, tickets, keywords = [], scope = 'user', confirm }) => {
   const result = await upsertProjectMapping({
     projectMemberId,
     projectName,
     tickets,
     keywords,
+    scope,
     confirm
   });
   return formatToolResponse(result);
