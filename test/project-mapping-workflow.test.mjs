@@ -5,10 +5,12 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  loadLocalConfig,
   configPath
 } from '../lib/logwork-config.mjs';
 import {
   helperHome,
+  legacyUserConfigPath,
   userConfigPath
 } from '../lib/paths.mjs';
 import {
@@ -176,7 +178,40 @@ test('config paths default to helper home and support project scope', async () =
   assert.equal(configPath(cwd, 'project'), join(cwd, '.logwork-helper.json'));
 });
 
-async function useTempHelperHome() {
+test('loadLocalConfig reads legacy home mapping and upsert migrates it into helper home', async () => {
+  const fakeHome = await mkdtemp(join(tmpdir(), 'logwork-helper-legacy-home-'));
+  process.env.HOME = fakeHome;
+  const helperHomePath = await useTempHelperHome({ preserveHome: true });
+  await fs.writeFile(legacyUserConfigPath(), JSON.stringify({
+    projectMappings: [
+      {
+        projectName: '2621A-SIT-HTML BUILDER-PRJ',
+        projectMemberId: 5234,
+        tickets: ['SCB'],
+        keywords: ['legacy']
+      }
+    ]
+  }), 'utf8');
+
+  assert.equal((await loadLocalConfig()).projectMappings[0].keywords[0], 'legacy');
+
+  const result = await upsertProjectMapping({
+    projectMemberId: 5234,
+    tickets: ['NEW'],
+    keywords: ['current'],
+    confirm: true,
+    fetchProjects: async () => projects
+  });
+
+  assert.equal(result.configPath, join(helperHomePath, '.logwork-helper.json'));
+  assert.deepEqual(result.mapping.tickets, ['SCB', 'NEW']);
+  assert.deepEqual(result.mapping.keywords, ['legacy', 'current']);
+});
+
+async function useTempHelperHome({ preserveHome = false } = {}) {
+  if (!preserveHome) {
+    process.env.HOME = await mkdtemp(join(tmpdir(), 'logwork-helper-test-home-'));
+  }
   const home = await mkdtemp(join(tmpdir(), 'logwork-helper-home-'));
   process.env.LOGWORK_HELPER_HOME = home;
   return home;
