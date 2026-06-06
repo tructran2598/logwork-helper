@@ -5,6 +5,13 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  configPath
+} from '../lib/logwork-config.mjs';
+import {
+  helperHome,
+  userConfigPath
+} from '../lib/paths.mjs';
+import {
   listLogworkProjects,
   upsertProjectMapping
 } from '../lib/project-mapping-workflow.mjs';
@@ -20,6 +27,7 @@ const projects = [
 
 test('upsertProjectMapping creates .logwork-helper.json and preview can use it', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-test-'));
+  const home = await useTempHelperHome();
 
   const result = await upsertProjectMapping({
     cwd,
@@ -31,6 +39,7 @@ test('upsertProjectMapping creates .logwork-helper.json and preview can use it',
   });
 
   assert.equal(result.status, 'created');
+  assert.equal(result.scope, 'user');
   assert.deepEqual(result.mapping, {
     projectName: '2621A-SIT-HTML BUILDER-PRJ',
     projectMemberId: 5234,
@@ -38,8 +47,12 @@ test('upsertProjectMapping creates .logwork-helper.json and preview can use it',
     keywords: ['question bank']
   });
 
-  const file = JSON.parse(await fs.readFile(join(cwd, '.logwork-helper.json'), 'utf8'));
+  const file = JSON.parse(await fs.readFile(join(home, '.logwork-helper.json'), 'utf8'));
   assert.equal(file.projectMappings[0].projectName, '2621A-SIT-HTML BUILDER-PRJ');
+  await assert.rejects(
+    () => fs.readFile(join(cwd, '.logwork-helper.json'), 'utf8'),
+    /ENOENT/
+  );
 
   const preview = await previewLogworkBatch({
     cwd,
@@ -55,8 +68,9 @@ test('upsertProjectMapping creates .logwork-helper.json and preview can use it',
 });
 
 test('upsertProjectMapping merges existing mapping and dedupes tickets and keywords', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-test-'));
-  await fs.writeFile(join(cwd, '.logwork-helper.json'), JSON.stringify({
+  await useTempHelperHome();
+  await fs.mkdir(helperHome(), { recursive: true });
+  await fs.writeFile(userConfigPath(), JSON.stringify({
     projectMappings: [
       {
         projectName: '2621A-SIT-HTML BUILDER-PRJ',
@@ -68,7 +82,6 @@ test('upsertProjectMapping merges existing mapping and dedupes tickets and keywo
   }), 'utf8');
 
   const result = await upsertProjectMapping({
-    cwd,
     projectName: 'HTML BUILDER',
     tickets: ['SCB', 'scb', 'NEW'],
     keywords: ['programme', 'question bank'],
@@ -82,11 +95,10 @@ test('upsertProjectMapping merges existing mapping and dedupes tickets and keywo
 });
 
 test('upsertProjectMapping rejects invalid project without writing config', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-test-'));
+  const home = await useTempHelperHome();
 
   await assert.rejects(
     () => upsertProjectMapping({
-      cwd,
       projectMemberId: 9999,
       tickets: ['SCB'],
       confirm: true,
@@ -96,7 +108,7 @@ test('upsertProjectMapping rejects invalid project without writing config', asyn
   );
 
   await assert.rejects(
-    () => fs.readFile(join(cwd, '.logwork-helper.json'), 'utf8'),
+    () => fs.readFile(join(home, '.logwork-helper.json'), 'utf8'),
     /ENOENT/
   );
 });
@@ -114,7 +126,8 @@ test('upsertProjectMapping requires explicit confirm true', async () => {
 });
 
 test('listLogworkProjects returns memberships and current mappings', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-test-'));
+  const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-project-'));
+  const home = await useTempHelperHome();
   await upsertProjectMapping({
     cwd,
     projectMemberId: 5234,
@@ -130,5 +143,41 @@ test('listLogworkProjects returns memberships and current mappings', async () =>
 
   assert.deepEqual(result.projects, projects);
   assert.equal(result.mappings.length, 1);
+  assert.equal(result.configSources.user, join(home, '.logwork-helper.json'));
+  assert.equal(result.configSources.project, join(cwd, '.logwork-helper.json'));
   assert.match(result.summary, /Found 1 Resource Optimiser project memberships/);
 });
+
+test('upsertProjectMapping can write project scoped mapping explicitly', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-project-'));
+  await useTempHelperHome();
+
+  const result = await upsertProjectMapping({
+    cwd,
+    scope: 'project',
+    projectMemberId: 5234,
+    tickets: ['SCB'],
+    confirm: true,
+    fetchProjects: async () => projects
+  });
+
+  assert.equal(result.scope, 'project');
+  assert.equal(result.configPath, join(cwd, '.logwork-helper.json'));
+  assert.equal(JSON.parse(await fs.readFile(join(cwd, '.logwork-helper.json'), 'utf8')).projectMappings.length, 1);
+});
+
+test('config paths default to helper home and support project scope', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-project-'));
+  const home = await useTempHelperHome();
+
+  assert.equal(helperHome(), home);
+  assert.equal(userConfigPath(), join(home, '.logwork-helper.json'));
+  assert.equal(configPath(cwd), join(home, '.logwork-helper.json'));
+  assert.equal(configPath(cwd, 'project'), join(cwd, '.logwork-helper.json'));
+});
+
+async function useTempHelperHome() {
+  const home = await mkdtemp(join(tmpdir(), 'logwork-helper-home-'));
+  process.env.LOGWORK_HELPER_HOME = home;
+  return home;
+}

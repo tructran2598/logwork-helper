@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
@@ -8,6 +11,7 @@ import {
 } from '../mcp-server.mjs';
 
 test('MCP server lists logwork tools over stdio', async () => {
+  const helperHome = await mkdtemp(join(tmpdir(), 'logwork-helper-home-'));
   const client = new Client({
     name: 'logwork-helper-test-client',
     version: '0.1.0'
@@ -16,6 +20,9 @@ test('MCP server lists logwork tools over stdio', async () => {
     command: process.execPath,
     args: ['mcp-server.mjs'],
     cwd: process.cwd(),
+    env: {
+      LOGWORK_HELPER_HOME: helperHome
+    },
     stderr: 'pipe'
   });
 
@@ -34,6 +41,7 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.equal(applyTool.inputSchema.properties.allowUnbooked.type, 'boolean');
     const setupTool = result.tools.find((tool) => tool.name === 'upsert_project_mapping');
     assert.equal(setupTool.inputSchema.properties.confirm.type, 'boolean');
+    assert.deepEqual(setupTool.inputSchema.properties.scope.enum, ['user', 'project']);
     const queryTool = result.tools.find((tool) => tool.name === 'query_logwork');
     assert.deepEqual(queryTool.inputSchema.properties.period.enum, ['today', 'this_week']);
 

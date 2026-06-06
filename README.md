@@ -14,13 +14,23 @@ The helper reads the Resource Optimiser token from Safari `localStorage`, shows 
 
 ## Quick Setup
 
+Install Logwork Helper once into `~/.logwork-helper`:
+
 ```bash
 git clone <your-logwork-helper-repo-url>
 cd logwork-helper
-./setup.sh /path/to/repo-that-you-commit-in
+./setup-user.sh
 ```
 
-Keep this `logwork-helper` folder on disk after setup. The installed Git hook calls the helper from this folder.
+The installer copies the helper to `~/.logwork-helper`, installs dependencies, and prints ready-to-paste MCP configs for Cursor, Codex, Antigravity, and GitHub Copilot / VS Code.
+
+Optional Git hook setup for a project repository:
+
+```bash
+~/.logwork-helper/setup.sh /path/to/repo-that-you-commit-in
+```
+
+Keep `~/.logwork-helper` on disk after setup. MCP clients and installed Git hooks call the helper from this folder.
 
 ## Safari Setup
 
@@ -70,21 +80,20 @@ The project picker only shows projects with a Resource Optimiser timesheet booki
 
 ## MCP Workflow
 
-Run Logwork Helper as a local MCP server from Cursor, Codex, Antigravity, GitHub Copilot, or another MCP client. The server uses `stdio`:
+Run Logwork Helper as a local MCP server from Cursor, Codex, Antigravity, GitHub Copilot, or another MCP client. The server uses `stdio` and stores mappings in `~/.logwork-helper/.logwork-helper.json`:
 
 ```json
 {
   "mcpServers": {
     "logwork-helper": {
       "command": "node",
-      "args": ["/absolute/path/to/logwork-helper/mcp-server.mjs"],
-      "cwd": "/absolute/path/to/logwork-helper"
+      "args": ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
     }
   }
 }
 ```
 
-Use the templates in `examples/mcp/` and replace `/absolute/path/to/logwork-helper` with this repository path.
+Use the templates in `examples/mcp/` and replace `/Users/<user>` with your macOS user path.
 
 ### Cursor
 
@@ -95,8 +104,7 @@ Add the server to Cursor MCP settings using the `mcpServers` JSON shape:
   "mcpServers": {
     "logwork-helper": {
       "command": "node",
-      "args": ["/absolute/path/to/logwork-helper/mcp-server.mjs"],
-      "cwd": "/absolute/path/to/logwork-helper"
+      "args": ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
     }
   }
 }
@@ -109,8 +117,7 @@ Add the server to `~/.codex/config.toml`, or project-scoped `.codex/config.toml`
 ```toml
 [mcp_servers.logwork-helper]
 command = "node"
-args = ["/absolute/path/to/logwork-helper/mcp-server.mjs"]
-cwd = "/absolute/path/to/logwork-helper"
+args = ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
 startup_timeout_sec = 20
 tool_timeout_sec = 120
 ```
@@ -126,8 +133,7 @@ Open Antigravity MCP raw config at `~/.gemini/antigravity/mcp_config.json` and a
   "mcpServers": {
     "logwork-helper": {
       "command": "node",
-      "args": ["/absolute/path/to/logwork-helper/mcp-server.mjs"],
-      "cwd": "/absolute/path/to/logwork-helper"
+      "args": ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
     }
   }
 }
@@ -145,8 +151,7 @@ Open workspace `.vscode/mcp.json` or the VS Code user MCP configuration and add:
     "logworkHelper": {
       "type": "stdio",
       "command": "node",
-      "args": ["/absolute/path/to/logwork-helper/mcp-server.mjs"],
-      "cwd": "/absolute/path/to/logwork-helper"
+      "args": ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
     }
   }
 }
@@ -179,11 +184,12 @@ MCP can generate or update project matching config for you. When preview cannot 
   "projectMemberId": 5234,
   "tickets": ["SCB"],
   "keywords": ["question bank", "programme", "cluster"],
+  "scope": "user",
   "confirm": true
 }
 ```
 
-This creates or updates `.logwork-helper.json` in the MCP server `cwd`:
+This creates or updates `~/.logwork-helper/.logwork-helper.json` by default:
 
 ```json
 {
@@ -229,7 +235,7 @@ MCP troubleshooting:
 
 - Restart or reload the MCP client after changing config.
 - If a client does not show `query_logwork` or `allowUnbooked`, reset/reload its MCP tool cache.
-- Keep `cwd` pointed at the `logwork-helper` repo so `.logwork-helper.json` is resolved consistently.
+- Keep `~/.logwork-helper` on disk because MCP config points to `~/.logwork-helper/mcp-server.mjs`.
 - Do not paste Resource Optimiser Bearer tokens into MCP config or `.logwork-helper.json`; auth is still read from Safari localStorage.
 
 ## Dry Run
