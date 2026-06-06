@@ -1,17 +1,52 @@
 {
   "name": "logwork-helper",
   "version": "0.1.0",
-  "private": true,
+  "description": "macOS Git hook, CLI, and local MCP server for logging work to Resource Optimiser.",
+  "license": "UNLICENSED",
   "type": "module",
+  "homepage": "https://github.com/tructran2598/logwork-helper#readme",
+  "bugs": {
+    "url": "https://github.com/tructran2598/logwork-helper/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tructran2598/logwork-helper.git"
+  },
+  "keywords": [
+    "logwork",
+    "resource-optimiser",
+    "mcp",
+    "codex",
+    "cursor",
+    "git-hook"
+  ],
   "engines": {
     "node": ">=20"
   },
+  "files": [
+    "cli.mjs",
+    "config.mjs",
+    "install-user.mjs",
+    "install.mjs",
+    "logwork-helper.mjs",
+    "manual-log.mjs",
+    "mcp-server.mjs",
+    "setup-user.sh",
+    "setup.sh",
+    "hooks/",
+    "lib/",
+    "examples/mcp/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
-    "logwork-helper-setup-user": "./install-user.mjs",
-    "logwork-helper-install": "./install.mjs",
-    "logwork-helper": "./logwork-helper.mjs",
-    "logwork-helper-manual": "./manual-log.mjs",
-    "logwork-helper-mcp": "./mcp-server.mjs"
+    "logwork-helper-setup-user": "install-user.mjs",
+    "logwork-helper-install": "install.mjs",
+    "logwork-helper": "cli.mjs",
+    "logwork-helper-manual": "manual-log.mjs",
+    "logwork-helper-mcp": "mcp-server.mjs"
   },
   "scripts": {
     "setup-user": "node install-user.mjs",

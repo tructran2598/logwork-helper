@@ -14,15 +14,29 @@ The helper reads the Resource Optimiser token from Safari `localStorage`, shows 
 
 ## Quick Setup
 
-Install Logwork Helper once into `~/.logwork-helper`:
+Install Logwork Helper once into `~/.logwork-helper` without cloning the repo:
 
 ```bash
-git clone <your-logwork-helper-repo-url>
-cd logwork-helper
-./setup-user.sh
+npx -y logwork-helper setup-user
 ```
 
-The installer copies the helper to `~/.logwork-helper`, installs dependencies, and prints ready-to-paste MCP configs for Cursor, Codex, Antigravity, and GitHub Copilot / VS Code.
+The installer copies the helper runtime to `~/.logwork-helper`, installs production dependencies, and prints ready-to-paste MCP configs for Cursor, Codex, Antigravity, and GitHub Copilot / VS Code.
+
+Equivalent npm/yarn install options:
+
+```bash
+npm install -g logwork-helper
+logwork-helper setup-user
+```
+
+```bash
+yarn dlx logwork-helper setup-user
+```
+
+```bash
+yarn global add logwork-helper
+logwork-helper setup-user
+```
 
 Optional Git hook setup for a project repository:
 
@@ -45,7 +59,7 @@ Then quit and reopen Safari once. If macOS asks for Automation permissions, allo
 
 ## Manual Setup
 
-Use this if you do not want to run `setup.sh`:
+Use this for local development or contribution from a cloned repository:
 
 ```bash
 npm ci
@@ -74,6 +88,7 @@ Run the same log-work flow without making a Git commit:
 npm run log
 npm run log -- "Fix login bug"
 node manual-log.mjs --message "Fix login bug"
+logwork-helper manual --message "Fix login bug"
 ```
 
 The project picker only shows projects with a Resource Optimiser timesheet booking for today. Assigned percent is calculated as booked hours per day divided by 8 hours.
@@ -250,13 +265,26 @@ Dry run builds the payload but does not call the write API.
 ## Update
 
 ```bash
-cd logwork-helper
-git pull
-npm ci
-./setup.sh /path/to/repo-that-you-commit-in
+npx -y logwork-helper setup-user
 ```
 
 Re-run setup after changing Node versions because the hook captures the absolute Node path at install time.
+
+For a global npm install:
+
+```bash
+npm update -g logwork-helper
+logwork-helper setup-user
+```
+
+For local development from a cloned repository:
+
+```bash
+cd logwork-helper
+git pull
+npm ci
+./setup-user.sh
+```
 
 ## Uninstall
 
