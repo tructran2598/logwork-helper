@@ -15,7 +15,9 @@ async function main() {
   const sourceDir = dirname(fileURLToPath(import.meta.url));
   const targetDir = helperHome();
   await fs.mkdir(targetDir, { recursive: true });
-  await copyDirectory(sourceDir, targetDir, sourceDir);
+  if (resolve(sourceDir) !== resolve(targetDir)) {
+    await copyDirectory(sourceDir, targetDir, sourceDir);
+  }
   await installDependencies(targetDir);
   printMcpInstructions(targetDir);
 }
@@ -49,22 +51,37 @@ async function copyDirectory(sourceDir, targetDir, rootDir) {
 function installDependencies(targetDir) {
   return new Promise((resolveValue, reject) => {
     const command = 'npm';
-    const args = ['ci'];
-    const child = spawn(command, args, {
-      cwd: targetDir,
-      stdio: 'inherit'
-    });
+    resolveInstallArgs(targetDir)
+      .then((args) => {
+        const child = spawn(command, args, {
+          cwd: targetDir,
+          stdio: 'inherit'
+        });
 
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolveValue();
-        return;
-      }
+        child.on('error', reject);
+        child.on('close', (code) => {
+          if (code === 0) {
+            resolveValue();
+            return;
+          }
 
-      reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}.`));
-    });
+          reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}.`));
+        });
+      })
+      .catch(reject);
   });
+}
+
+async function resolveInstallArgs(targetDir) {
+  try {
+    await fs.access(join(targetDir, 'package-lock.json'));
+    return ['ci', '--omit=dev'];
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+    return ['install', '--omit=dev'];
+  }
 }
 
 function printMcpInstructions(targetDir) {
