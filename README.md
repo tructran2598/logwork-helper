@@ -1,28 +1,55 @@
 # Logwork Helper
 
-macOS Git `commit-msg` hook plus an interactive Node.js CLI for logging work to Resource Optimiser.
+Local MCP server for AI assistants to query, preview, and submit Resource Optimiser logwork.
 
-The helper reads the Resource Optimiser token from Safari `localStorage`, shows only projects booked for today, and submits logtime to the selected booked project.
+Logwork Helper is designed for Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, and other MCP clients. It runs locally over `stdio`, reads your Resource Optimiser session from Safari, and stores only local project matching hints.
+
+## Quick Start
+
+1. Install the helper:
+
+```bash
+ npx -y logwork-helper setup-user
+```
+
+2. Log in to Resource Optimiser in Safari:
+
+```text
+ https://app.resourceoptimiser.com
+```
+
+3. Enable Safari auth access:
+
+```text
+ Safari -> Settings -> Advanced -> Show features for web developers
+ Develop -> Allow JavaScript from Apple Events
+```
+
+4. Copy the MCP config printed by the installer into your IDE.
+5. Restart or reload your IDE MCP tools.
+6. Ask your AI assistant:
+
+```text
+ double check log work this week
+```
 
 ## Requirements
 
 - macOS
 - Node.js 20+
-- npm
+- npm, or yarn if you prefer `yarn dlx`
 - Safari
 - Logged-in Resource Optimiser session in Safari
 
-## Quick Setup
+## Install
 
-Install Logwork Helper once into `~/.logwork-helper` without cloning the repo:
+Recommended one-time install:
 
 ```bash
 npx -y logwork-helper setup-user
 ```
 
-The installer copies the helper runtime to `~/.logwork-helper`, installs production dependencies, and prints ready-to-paste MCP configs for Cursor, Codex, Antigravity, and GitHub Copilot / VS Code.
-
-Equivalent npm/yarn install options:
+Equivalent options:
 
 ```bash
 npm install -g logwork-helper
@@ -38,15 +65,11 @@ yarn global add logwork-helper
 logwork-helper setup-user
 ```
 
-Optional Git hook setup for a project repository:
+The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, and prints ready-to-paste MCP configs using your actual macOS path.
 
-```bash
-~/.logwork-helper/setup.sh /path/to/repo-that-you-commit-in
-```
+## Safari Auth Setup
 
-Keep `~/.logwork-helper` on disk after setup. MCP clients and installed Git hooks call the helper from this folder.
-
-## Safari Setup
+Logwork Helper does not accept or store Bearer tokens. It reads your Resource Optimiser token locally from Safari `localStorage`.
 
 Enable Safari JavaScript from Apple Events:
 
@@ -55,64 +78,15 @@ Safari -> Settings -> Advanced -> Show features for web developers
 Develop -> Allow JavaScript from Apple Events
 ```
 
-Then quit and reopen Safari once. If macOS asks for Automation permissions, allow Terminal or your Git client to control Safari and Terminal.
+Then quit and reopen Safari once. If macOS asks for Automation permissions, allow your terminal or IDE to control Safari.
 
-## Manual Setup
+## MCP Setup
 
-Use this for local development or contribution from a cloned repository:
-
-```bash
-npm ci
-node install.mjs /path/to/repo-that-you-commit-in
-```
-
-The installer backs up an existing `commit-msg` hook and chains it before Logwork Helper.
-
-## Usage
-
-Commit normally from Terminal, VS Code, or GitLens. The `commit-msg` hook opens a Terminal window and waits for the helper result.
-
-Result behavior:
-
-```text
-ok    => commit allowed
-skip  => commit allowed
-abort => commit blocked
-```
-
-## Manual Log
-
-Run the same log-work flow without making a Git commit:
-
-```bash
-npm run log
-npm run log -- "Fix login bug"
-node manual-log.mjs --message "Fix login bug"
-logwork-helper manual --message "Fix login bug"
-```
-
-The project picker only shows projects with a Resource Optimiser timesheet booking for today. Assigned percent is calculated as booked hours per day divided by 8 hours.
-
-## MCP Workflow
-
-Run Logwork Helper as a local MCP server from Cursor, Codex, Antigravity, GitHub Copilot, or another MCP client. The server uses `stdio` and stores mappings in `~/.logwork-helper/.logwork-helper.json`:
-
-```json
-{
-  "mcpServers": {
-    "logwork-helper": {
-      "command": "node",
-      "args": ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
-    }
-  }
-}
-```
-
-Use the templates in `examples/mcp/` and replace `/Users/<user>` with your macOS user path.
+Use the exact config printed by `logwork-helper setup-user` when possible. The examples below use `/Users/<user>` as a placeholder.
 
 ### Cursor
 
-Add the server to Cursor MCP settings using the `mcpServers` JSON shape:
+Add this to Cursor MCP settings:
 
 ```json
 {
@@ -127,7 +101,7 @@ Add the server to Cursor MCP settings using the `mcpServers` JSON shape:
 
 ### Codex
 
-Add the server to `~/.codex/config.toml`, or project-scoped `.codex/config.toml` for trusted projects:
+Add this to `~/.codex/config.toml`, or to project `.codex/config.toml`:
 
 ```toml
 [mcp_servers.logwork-helper]
@@ -137,11 +111,9 @@ startup_timeout_sec = 20
 tool_timeout_sec = 120
 ```
 
-Equivalent template: `examples/mcp/codex.config.toml`.
-
 ### Google Antigravity
 
-Open Antigravity MCP raw config at `~/.gemini/antigravity/mcp_config.json` and add:
+Add this to `~/.gemini/antigravity/mcp_config.json`:
 
 ```json
 {
@@ -154,11 +126,9 @@ Open Antigravity MCP raw config at `~/.gemini/antigravity/mcp_config.json` and a
 }
 ```
 
-Equivalent template: `examples/mcp/antigravity.mcp_config.json`.
-
 ### GitHub Copilot / VS Code
 
-Open workspace `.vscode/mcp.json` or the VS Code user MCP configuration and add:
+Add this to workspace `.vscode/mcp.json` or your VS Code user MCP config:
 
 ```json
 {
@@ -172,17 +142,57 @@ Open workspace `.vscode/mcp.json` or the VS Code user MCP configuration and add:
 }
 ```
 
-Equivalent template: `examples/mcp/copilot.mcp.json`.
+After editing config, restart/reload the IDE. The MCP server should expose:
 
-The MCP server exposes five tools:
+- `query_logwork`
+- `preview_logwork_batch`
+- `apply_logwork_batch`
+- `list_logwork_projects`
+- `upsert_project_mapping`
 
-- `preview_logwork_batch`: parses a weekly text block, resolves booked projects by date, and returns a human-readable preview plus structured JSON. If a task is not booked that day but matches a project membership through `.logwork-helper.json`, it is returned as `resolved_unbooked`.
-- `apply_logwork_batch`: submits an approved preview. It requires `confirm: true` and refuses to run while entries are unresolved. Entries with `resolved_unbooked` require an additional `allowUnbooked: true` flag.
-- `query_logwork`: checks booked/logged work by date, range, period, and optional project filter without changing data. It fetches task-level log details from `/member-logtime` when entries are requested.
-- `list_logwork_projects`: lists your Resource Optimiser project memberships and current local project mappings.
-- `upsert_project_mapping`: creates or updates a local ticket/keyword mapping after explicit approval with `confirm: true`.
+Templates are also available in `examples/mcp/`.
 
-Supported weekly text format:
+## Verify With AI Prompts
+
+Use these prompts after your IDE sees `logwork-helper`:
+
+```text
+kiểm tra log work tuần này
+```
+
+```text
+repo này đang logwork cho dự án nào trên RO
+```
+
+```text
+preview logwork sau rồi hỏi tôi trước khi submit:
+Monday, 01 Jun 2026
++2 Maintenance mode management and status UI (SCB-213)
+```
+
+```text
+setup mapping SCB vào project 2621A-SIT-HTML BUILDER-PRJ
+```
+
+## Common Workflows
+
+### Query Logwork
+
+Ask your assistant:
+
+```text
+kiểm tra hôm nay tôi đã log gì chưa
+```
+
+```text
+trong tuần này tôi đã log work ngày nào và cho dự án nào, liệt kê chi tiết
+```
+
+The assistant should call `query_logwork`. This is read-only and does not need confirmation.
+
+### Preview Then Apply
+
+Use weekly text like this:
 
 ```text
 Monday, 01 Jun 2026
@@ -192,19 +202,30 @@ Tuesday, 02 Jun 2026
 +2.5 Password reset validation and UI improvements (SCB-228)
 ```
 
-MCP can generate or update project matching config for you. When preview cannot resolve a ticket like `SCB-213`, choose a project from `list_logwork_projects`, then call `upsert_project_mapping`:
+Expected flow:
 
-```json
-{
-  "projectMemberId": 5234,
-  "tickets": ["SCB"],
-  "keywords": ["question bank", "programme", "cluster"],
-  "scope": "user",
-  "confirm": true
-}
+1. Assistant calls `preview_logwork_batch`.
+2. Assistant shows the summary and asks for approval.
+3. Assistant calls `apply_logwork_batch` only after you approve.
+
+`apply_logwork_batch` requires `confirm: true`.
+
+### Setup Project Mapping
+
+You do not need to create `.logwork-helper.json` manually.
+
+If preview cannot resolve a ticket like `SCB-213`, ask your assistant to list projects or choose the correct project. The assistant can call:
+
+- `list_logwork_projects` to fetch your Resource Optimiser project memberships.
+- `upsert_project_mapping` to save ticket/keyword mapping after approval.
+
+Default mapping storage:
+
+```text
+~/.logwork-helper/.logwork-helper.json
 ```
 
-This creates or updates `~/.logwork-helper/.logwork-helper.json` by default:
+Example mapping created by MCP:
 
 ```json
 {
@@ -219,119 +240,87 @@ This creates or updates `~/.logwork-helper/.logwork-helper.json` by default:
 }
 ```
 
-The config is only for project matching hints. MCP never stores Resource Optimiser tokens in it.
+This file stores matching hints only. It never stores Resource Optimiser tokens.
 
-Mapping setup flow:
+### Allow Unbooked Logging
 
-1. Run `preview_logwork_batch`.
-2. If the preview is unresolved, inspect `setupSuggestions`.
-3. Run `list_logwork_projects` if you want to see all project candidates.
-4. After user approval, run `upsert_project_mapping`.
-5. Run `preview_logwork_batch` again.
+If a task matches one of your Resource Optimiser project memberships but is not booked for that date, preview marks it as `UNBOOKED`.
 
-Unbooked MCP logwork flow:
+Only allow this when the matched project is correct. Applying unbooked entries requires both:
 
-1. Run `preview_logwork_batch`.
-2. Check any `UNBOOKED` lines in the summary and verify the matched project is correct.
-3. Only after explicit user approval, run `apply_logwork_batch` with both `confirm: true` and `allowUnbooked: true`.
+```json
+{
+  "confirm": true,
+  "allowUnbooked": true
+}
+```
 
-This unbooked flow is only available through MCP. The Git hook and manual CLI still only log against projects booked for the selected day.
+## Stored Files And Security
 
-Query examples:
+Installed runtime:
 
 ```text
-Check what I logged today.
-Check my logwork from 2026-05-18 to 2026-06-29 for SCB.
-List detailed logwork for this week by day and project.
-Check 2026-06-05 and include entries.
+~/.logwork-helper
 ```
 
-MCP troubleshooting:
+Project mapping config:
 
-- Restart or reload the MCP client after changing config.
-- If a client does not show `query_logwork` or `allowUnbooked`, reset/reload its MCP tool cache.
-- Keep `~/.logwork-helper` on disk because MCP config points to `~/.logwork-helper/mcp-server.mjs`.
-- Do not paste Resource Optimiser Bearer tokens into MCP config or `.logwork-helper.json`; auth is still read from Safari localStorage.
-
-## Dry Run
-
-```bash
-LOGWORK_DRY_RUN=1 git commit
-npm run log:dry-run
+```text
+~/.logwork-helper/.logwork-helper.json
 ```
 
-Dry run builds the payload but does not call the write API.
+Security model:
+
+- Token is read locally from Safari `localStorage`.
+- Token is not stored in MCP config.
+- Token is not stored in `.logwork-helper.json`.
+- MCP writes logwork only after an assistant calls `apply_logwork_batch` with explicit confirmation.
+- `query_logwork` and `list_logwork_projects` are read-only.
 
 ## Update
+
+For `npx` users:
 
 ```bash
 npx -y logwork-helper setup-user
 ```
 
-Re-run setup after changing Node versions because the hook captures the absolute Node path at install time.
-
-For a global npm install:
+For global npm users:
 
 ```bash
 npm update -g logwork-helper
 logwork-helper setup-user
 ```
 
-For local development from a cloned repository:
-
-```bash
-cd logwork-helper
-git pull
-npm ci
-./setup-user.sh
-```
-
-## Uninstall
-
-In the target Git repo:
-
-```bash
-cd /path/to/repo-that-you-commit-in
-ls .git/hooks/commit-msg.logwork-backup.*
-```
-
-If a backup exists, restore it:
-
-```bash
-mv .git/hooks/commit-msg.logwork-backup.<timestamp> .git/hooks/commit-msg
-chmod +x .git/hooks/commit-msg
-```
-
-If there was no previous hook, remove the Logwork Helper hook:
-
-```bash
-rm .git/hooks/commit-msg
-```
+Restart/reload your IDE after updating.
 
 ## Troubleshooting
 
-- **No projects shown**: you are not booked in Resource Optimiser today.
-- **Safari localStorage error**: confirm `Develop -> Allow JavaScript from Apple Events`, then quit and reopen Safari.
-- **macOS Automation prompt**: allow Terminal or your Git client to control Safari and Terminal in `System Settings -> Privacy & Security -> Automation`.
-- **Hook timeout**: the hook removes stale lock files automatically; retry the commit after fixing the visible error.
-- **Existing commit hook**: the installer backs it up as `commit-msg.logwork-backup.<timestamp>` and runs it first.
-- **Token safety**: the token is read locally from Safari and is never printed, passed through argv, or written to lock/result files.
+- **IDE does not show tools**: restart/reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs`.
+- **`query_logwork` or `allowUnbooked` missing**: reload the MCP tool cache or restart the IDE.
+- **Safari localStorage error**: enable `Develop -> Allow JavaScript from Apple Events`, then quit and reopen Safari.
+- **macOS Automation prompt**: allow your terminal or IDE to control Safari in `System Settings -> Privacy & Security -> Automation`.
+- **No project matched**: ask the assistant to call `list_logwork_projects`, choose the correct project, then call `upsert_project_mapping`.
+- **Do not paste Bearer tokens**: auth is read from Safari; MCP config should only contain `command` and `args`.
 
-## API Notes
+## Legacy / Advanced CLI
 
-- Read today bookings: `GET /member-logtime/timesheet`
-- Write logtime: `PATCH /member-logtime/:project_member_id`
-- Payload shape:
+Git hook and manual CLI workflows still exist for compatibility, but they are not required for MCP users.
 
-```json
-{
-  "add_data": [
-    {
-      "project_member_id": 5352,
-      "logtimes": 0.5,
-      "task_name": "Fix login bug",
-      "logdate": "2026-06-05T00:00:00.000Z"
-    }
-  ]
-}
+Manual log:
+
+```bash
+logwork-helper manual --message "Fix login bug"
+```
+
+Optional Git hook install:
+
+```bash
+~/.logwork-helper/setup.sh /path/to/repo-that-you-commit-in
+```
+
+Dry run:
+
+```bash
+LOGWORK_DRY_RUN=1 logwork-helper manual --message "Dry run task"
 ```
