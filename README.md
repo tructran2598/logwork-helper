@@ -349,6 +349,81 @@ logwork-helper setup-user
 
 Restart/reload your IDE after updating.
 
+## Manual Terminal REPL
+
+If you want to log work directly from Terminal without an MCP client, use the deterministic React + Ink manual session:
+
+```bash
+logwork
+```
+
+If you have not installed the package globally, run the same REPL one-off with:
+
+```bash
+npx -p logwork-helper logwork
+```
+
+Compatibility commands still work:
+
+```bash
+logwork-helper manual
+logwork-helper log
+```
+
+Prompt preview:
+
+```text
+╭─ Logwork Helper ─────────────────────────────╮
+│ cwd: /path/to/repo                           │
+╰──────────────────────────────────────────────╯
+
+logwork › /
+╭──────────────────────────────────────────────╮
+│ › /query      Query logwork by day or range  │
+│   /logwork    Create logwork wizard          │
+│   /projects   List projects with weekly chart│
+╰──────────────────────────────────────────────╯
+```
+
+Useful commands inside the session:
+
+```text
+/query today
+/query this-week
+/logwork
+/projects
+/projects 5234
+/map SCB 5234
+```
+
+`/logwork` opens a guided flow: pick a day in the current week, pick a Resource Optimiser project, then enter one task per line:
+
+```text
++2 check ui/ux
++1.5 polish reset password state
+
+```
+
+Inside `/logwork`, press Enter on an empty input to apply the ready preview. Use `/remove` to open a multi-select task remover, `/edit` to replace a task, `/save` to persist a local draft, or `Esc` to cancel with confirmation. The panel shows only the current command/session so the draft preview stays readable.
+
+While the `task ›` prompt is active, type `/` to see task-only actions with descriptions:
+
+```text
+/save     Save this draft locally
+/drafts   Resume or delete saved drafts
+/remove   Select tasks to delete
+/edit     Select one task and replace it
+/clear    Clear current task list
+/back     Return to project picker
+/cancel   Discard this logwork session
+```
+
+Press `Esc` in the task editor to cancel the current logwork session; if tasks exist, the CLI asks for confirmation first. Drafts saved with `/save` are stored locally at `~/.logwork-helper/manual-drafts.json` and never contain tokens, passwords, or OTPs. Running `/logwork` again detects saved drafts so you can resume or delete them before starting a new session.
+
+Press `Esc` from the main prompt to exit the manual CLI.
+
+The manual REPL uses the same safety model as MCP: preview first, explicit confirmation before submit, extra confirmation for unbooked entries, and API-only Resource Optimiser auth in Terminal. `/projects` shows this-week booked/logged charts per project so you can quickly see booked capacity, logged hours, and overbooked work.
+
 ## Troubleshooting
 
 - **IDE does not show tools**: restart/reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs`.
@@ -360,12 +435,12 @@ Restart/reload your IDE after updating.
 
 ## Legacy / Advanced CLI
 
-Git hook and manual CLI workflows still exist for compatibility, but they are not required for MCP users.
+Git hook and quick manual workflows still exist for compatibility, but they are not required for MCP users.
 
-Manual log:
+Quick manual log:
 
 ```bash
-logwork-helper manual --message "Fix login bug"
+logwork-helper manual quick --message "Fix login bug"
 ```
 
 Optional Git hook install:
@@ -377,5 +452,5 @@ Optional Git hook install:
 Dry run:
 
 ```bash
-LOGWORK_DRY_RUN=1 logwork-helper manual --message "Dry run task"
+LOGWORK_DRY_RUN=1 logwork-helper manual quick --message "Dry run task"
 ```

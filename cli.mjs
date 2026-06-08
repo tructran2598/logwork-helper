@@ -38,11 +38,29 @@ Authentication uses the Resource Optimiser / Keycloak API flow and does not open
   }],
   ['manual', {
     script: 'manual-log.mjs',
-    description: 'Run the interactive manual log workflow.'
+    description: 'Open the manual terminal logwork REPL.',
+    help: `Usage:
+  logwork
+  logwork-helper manual
+  logwork-helper manual quick --message "Task name"
+
+Preferred shortcut:
+  logwork
+
+Commands inside the REPL:
+  Type / for live command suggestions.
+  /help
+  /query today
+  /query this-week
+  /logwork
+  /projects
+  /projects 5234
+  /map SCB 5234
+  Press Esc to exit`
   }],
   ['log', {
     script: 'manual-log.mjs',
-    description: 'Alias for manual.'
+    description: 'Alias for manual terminal REPL.'
   }],
   ['install-hook', {
     script: 'install.mjs',
@@ -120,7 +138,9 @@ function printHelp() {
   logwork-helper setup-user
   logwork-helper auth login
   logwork-helper mcp
-  logwork-helper manual [--message "Task name"]
+  logwork
+  logwork-helper manual
+  logwork-helper manual quick --message "Task name"
   logwork-helper install-hook /path/to/repo
   logwork-helper hook --repo <repo> --msg-file <file> --lock <file> --result <file> --nonce <id> --terminal-title <title>
 

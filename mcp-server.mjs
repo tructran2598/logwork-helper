@@ -2,7 +2,6 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import {
   applyLogworkBatch,
@@ -11,6 +10,7 @@ import {
 } from './lib/batch-workflow.mjs';
 import { authRequiredPayload, isAuthRequiredError } from './lib/auth-errors.mjs';
 import { startAuthLoginTerminal } from './lib/auth-terminal.mjs';
+import { isMainModule } from './lib/entrypoint.mjs';
 import {
   listLogworkProjects,
   upsertProjectMapping
@@ -133,7 +133,7 @@ async function main() {
   await server.connect(transport);
 }
 
-if (isMainModule()) {
+if (isMainModule(import.meta.url)) {
   main().catch((error) => {
     console.error('Logwork Helper MCP server error:', error);
     process.exit(1);
@@ -190,8 +190,4 @@ function withAuthRequiredHandling(handler) {
       throw error;
     }
   };
-}
-
-function isMainModule() {
-  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 }

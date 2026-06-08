@@ -5,7 +5,7 @@ import {
   loginResourceOptimiser,
   logoutResourceOptimiser
 } from './lib/auth.mjs';
-import { pathToFileURL } from 'node:url';
+import { isMainModule } from './lib/entrypoint.mjs';
 
 async function main() {
   const [command, ...args] = process.argv.slice(2);
@@ -87,13 +87,9 @@ export function parseLoginArgs(args = []) {
   return { mode: 'api' };
 }
 
-if (isMainModule()) {
+if (isMainModule(import.meta.url)) {
   main().catch((error) => {
     console.error(error.message);
     process.exit(1);
   });
-}
-
-function isMainModule() {
-  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 }

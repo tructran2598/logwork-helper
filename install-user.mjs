@@ -3,7 +3,8 @@
 import { promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { isMainModule } from './lib/entrypoint.mjs';
 import { helperHome } from './lib/paths.mjs';
 
 const EXCLUDED_DIRS = new Set([
@@ -212,13 +213,9 @@ function printMcpInstructions(targetDir, authResult = null) {
   console.log(`  ${resolve(targetDir, 'setup.sh')} /path/to/project-repo`);
 }
 
-if (isMainModule()) {
+if (isMainModule(import.meta.url)) {
   main().catch((error) => {
     console.error(error.message);
     process.exit(1);
   });
-}
-
-function isMainModule() {
-  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 }

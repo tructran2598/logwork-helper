@@ -1,6 +1,6 @@
 {
   "name": "logwork-helper",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local MCP server for querying, previewing, and submitting Resource Optimiser logwork.",
   "license": "UNLICENSED",
   "type": "module",
@@ -43,6 +43,7 @@
     "access": "public"
   },
   "bin": {
+    "logwork": "manual-log.mjs",
     "logwork-helper-setup-user": "install-user.mjs",
     "logwork-helper-install": "install.mjs",
     "logwork-helper": "cli.mjs",
@@ -61,6 +62,11 @@
   "dependencies": {
     "@clack/prompts": "^1.5.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "chalk": "^5.6.2",
+    "ink": "^7.0.5",
+    "ink-select-input": "^6.2.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.7",
     "zod": "^4.4.3"
   }
 }
