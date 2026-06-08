@@ -1,7 +1,7 @@
 {
   "name": "logwork-helper",
-  "version": "0.1.1",
-  "description": "macOS Git hook, CLI, and local MCP server for logging work to Resource Optimiser.",
+  "version": "0.1.2",
+  "description": "Local MCP server for querying, previewing, and submitting Resource Optimiser logwork.",
   "license": "UNLICENSED",
   "type": "module",
   "homepage": "https://github.com/tructran2598/logwork-helper#readme",
@@ -24,6 +24,7 @@
     "node": ">=20"
   },
   "files": [
+    "auth-cli.mjs",
     "cli.mjs",
     "config.mjs",
     "install-user.mjs",

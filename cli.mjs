@@ -10,7 +10,13 @@ const helperDir = dirname(fileURLToPath(import.meta.url));
 const COMMANDS = new Map([
   ['setup-user', {
     script: 'install-user.mjs',
-    description: 'Install Logwork Helper into ~/.logwork-helper and print MCP configs.'
+    description: 'Install Logwork Helper into ~/.logwork-helper and print MCP configs.',
+    help: `Usage:
+  logwork-helper setup-user [--login|--no-login]
+
+Options:
+  --login     Run Resource Optimiser auth login after installing
+  --no-login  Do not prompt for auth login after installing`
   }],
   ['install-user', {
     script: 'install-user.mjs',
@@ -19,6 +25,16 @@ const COMMANDS = new Map([
   ['mcp', {
     script: 'mcp-server.mjs',
     description: 'Run the local MCP stdio server.'
+  }],
+  ['auth', {
+    script: 'auth-cli.mjs',
+    description: 'Manage Resource Optimiser authentication.',
+    help: `Usage:
+  logwork-helper auth login
+  logwork-helper auth status
+  logwork-helper auth logout
+
+Authentication uses the Resource Optimiser / Keycloak API flow and does not open a browser.`
   }],
   ['manual', {
     script: 'manual-log.mjs',
@@ -102,6 +118,7 @@ function runScript(script, args) {
 function printHelp() {
   console.log(`Usage:
   logwork-helper setup-user
+  logwork-helper auth login
   logwork-helper mcp
   logwork-helper manual [--message "Task name"]
   logwork-helper install-hook /path/to/repo
@@ -117,6 +134,11 @@ Options:
 }
 
 function printCommandHelp(name, command) {
+  if (command.help) {
+    console.log(`${command.help}\n`);
+    return;
+  }
+
   console.log(`Usage:
   logwork-helper ${name}
 

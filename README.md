@@ -5,29 +5,23 @@
 
 Local MCP server for AI assistants to query, preview, and submit Resource Optimiser logwork.
 
-Logwork Helper is designed for Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, and other MCP clients. It runs locally over `stdio`, reads your Resource Optimiser session from Safari, and stores only local project matching hints.
+Logwork Helper is designed for Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, and other MCP clients. It runs locally over `stdio`, authenticates through Resource Optimiser / Keycloak APIs, and stores only local project matching hints.
 
 ## Quick Start
 
 1. Install the helper:
 
 ```bash
- npx -y logwork-helper setup-user
+npx -y logwork-helper setup-user
 ```
 
-2. Log in to Resource Optimiser in Safari:
+2. Authenticate Resource Optimiser:
 
-```text
- https://app.resourceoptimiser.com
+```bash
+logwork-helper auth login
 ```
 
-3. Enable Safari auth access:
-
-```text
- Safari -> Settings -> Advanced -> Show features for web developers
- Develop -> Allow JavaScript from Apple Events
-```
-
+3. Follow the terminal prompts for email, password, 2FA device, and 2FA code.
 4. Copy the MCP config printed by the installer into your IDE.
 5. Restart or reload your IDE MCP tools.
 6. Ask your AI assistant:
@@ -41,8 +35,6 @@ Check my logwork for this week.
 - macOS
 - Node.js 20+
 - npm, or yarn if you prefer `yarn dlx`
-- Safari
-- Logged-in Resource Optimiser session in Safari
 
 ## Install
 
@@ -68,20 +60,72 @@ yarn global add logwork-helper
 logwork-helper setup-user
 ```
 
-The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, and prints ready-to-paste MCP configs using your actual macOS path.
+The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, then prints ready-to-paste MCP configs using your actual macOS path.
 
-## Safari Auth Setup
+To install and start auth immediately:
 
-Logwork Helper does not accept or store Bearer tokens. It reads your Resource Optimiser token locally from Safari `localStorage`.
-
-Enable Safari JavaScript from Apple Events:
-
-```text
-Safari -> Settings -> Advanced -> Show features for web developers
-Develop -> Allow JavaScript from Apple Events
+```bash
+npx -y logwork-helper setup-user --login
 ```
 
-Then quit and reopen Safari once. If macOS asks for Automation permissions, allow your terminal or IDE to control Safari.
+Use `--no-login` when installing in scripts or CI.
+
+## Auth Setup
+
+Logwork Helper does not accept or store Bearer tokens in config files. Login is API-only: the helper creates a fresh Keycloak OIDC authorize session, asks for email/password/device/2FA in the terminal, exchanges the authorization code, calls Resource Optimiser `signinKeyCloak`, and stores only the final Resource Optimiser API token in macOS Keychain.
+
+Start login:
+
+```bash
+logwork-helper auth login
+```
+
+What happens:
+
+1. The helper creates a fresh Keycloak authorization request.
+2. You enter Resource Optimiser email and password in the terminal.
+3. You choose the 2FA device in the terminal.
+4. You enter the 2FA code in the terminal.
+5. The helper exchanges the Keycloak authorization code.
+6. The helper calls Resource Optimiser `signinKeyCloak`.
+7. The helper stores the Resource Optimiser API token in macOS Keychain.
+
+Check auth status without printing the token:
+
+```bash
+logwork-helper auth status
+```
+
+Delete the stored token:
+
+```bash
+logwork-helper auth logout
+```
+
+Auth notes:
+
+- Password and 2FA are never accepted through MCP tool inputs or AI chat.
+- Password and 2FA are never stored.
+- Keycloak URLs contain dynamic `state`, `nonce`, `execution`, and `tab_id` values. Do not hardcode or paste them into config.
+- Keycloak access tokens are intermediate only and are not stored.
+- Only the final Resource Optimiser API token is stored in macOS Keychain.
+
+### Auth Security Flow
+
+```mermaid
+flowchart TD
+  A["User runs logwork-helper auth login"] --> B["Helper creates fresh Keycloak authorize request"]
+  B --> C["User enters email/password/device/2FA in terminal"]
+  C --> D["Helper exchanges Keycloak authorization code"]
+  D --> E["Helper calls Resource Optimiser signinKeyCloak"]
+  E --> F["Helper validates JWT expiry and user id"]
+  F --> G["Final RO token saved to macOS Keychain"]
+  G --> H["MCP tools call Resource Optimiser APIs with the local Keychain token"]
+
+  I["MCP config"] -. "no token" .-> H
+  J[".logwork-helper.json"] -. "project mapping only" .-> H
+  K["AI chat / MCP args"] -. "no password or 2FA" .-> C
+```
 
 ## MCP Setup
 
@@ -152,6 +196,9 @@ After editing config, restart/reload the IDE. The MCP server should expose:
 - `apply_logwork_batch`
 - `list_logwork_projects`
 - `upsert_project_mapping`
+- `start_auth_login`
+
+If an MCP tool says auth is required, ask your assistant to call `start_auth_login` or run `logwork-helper auth login` yourself in Terminal. Do not paste passwords or 2FA codes into AI chat.
 
 Templates are also available in `examples/mcp/`.
 
@@ -274,9 +321,14 @@ Project mapping config:
 
 Security model:
 
-- Token is read locally from Safari `localStorage`.
+- Password and 2FA are entered in the terminal, not in MCP tool inputs or AI chat.
+- Password and 2FA are never stored.
+- Email may be remembered in macOS Keychain to prefill the next login.
+- Keycloak access tokens are intermediate only and are not stored.
+- The final Resource Optimiser API token is stored in macOS Keychain.
 - Token is not stored in MCP config.
 - Token is not stored in `.logwork-helper.json`.
+- Auth does not open or read any browser profile.
 - MCP writes logwork only after an assistant calls `apply_logwork_batch` with explicit confirmation.
 - `query_logwork` and `list_logwork_projects` are read-only.
 
@@ -301,10 +353,10 @@ Restart/reload your IDE after updating.
 
 - **IDE does not show tools**: restart/reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs`.
 - **`query_logwork` or `allowUnbooked` missing**: reload the MCP tool cache or restart the IDE.
-- **Safari localStorage error**: enable `Develop -> Allow JavaScript from Apple Events`, then quit and reopen Safari.
-- **macOS Automation prompt**: allow your terminal or IDE to control Safari in `System Settings -> Privacy & Security -> Automation`.
+- **Not authenticated**: run `logwork-helper auth login`, or ask the assistant to call `start_auth_login`; enter secrets only in Terminal.
+- **Auth error after 2FA**: retry `logwork-helper auth login`. If it still fails, do not paste raw tokens/cookies/passwords; share only sanitized error messages.
 - **No project matched**: ask the assistant to call `list_logwork_projects`, choose the correct project, then call `upsert_project_mapping`.
-- **Do not paste Bearer tokens**: auth is read from Safari; MCP config should only contain `command` and `args`.
+- **Do not paste Bearer tokens, cookies, passwords, OTPs, or raw curl auth logs**: auth is handled locally and MCP config should only contain `command` and `args`.
 
 ## Legacy / Advanced CLI
 

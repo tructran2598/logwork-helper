@@ -35,6 +35,7 @@ test('MCP server lists logwork tools over stdio', async () => {
       'list_logwork_projects',
       'preview_logwork_batch',
       'query_logwork',
+      'start_auth_login',
       'upsert_project_mapping'
     ]);
     const applyTool = result.tools.find((tool) => tool.name === 'apply_logwork_batch');
@@ -44,6 +45,10 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.deepEqual(setupTool.inputSchema.properties.scope.enum, ['user', 'project']);
     const queryTool = result.tools.find((tool) => tool.name === 'query_logwork');
     assert.deepEqual(queryTool.inputSchema.properties.period.enum, ['today', 'this_week']);
+    const authTool = result.tools.find((tool) => tool.name === 'start_auth_login');
+    assert.deepEqual(authTool.inputSchema.properties, {});
+    assert.equal(authTool.inputSchema.properties.password, undefined);
+    assert.equal(authTool.inputSchema.properties.otp, undefined);
 
     const preview = await client.callTool({
       name: 'preview_logwork_batch',

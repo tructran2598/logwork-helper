@@ -9,6 +9,8 @@ import {
   formatToolResponse,
   previewLogworkBatch
 } from './lib/batch-workflow.mjs';
+import { authRequiredPayload, isAuthRequiredError } from './lib/auth-errors.mjs';
+import { startAuthLoginTerminal } from './lib/auth-terminal.mjs';
 import {
   listLogworkProjects,
   upsertProjectMapping
@@ -31,12 +33,12 @@ server.registerTool('preview_logwork_batch', {
     timezone: z.string().optional().describe('Reserved for future date parsing; current parser uses explicit dates in the text.'),
     projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Map preview entry id to projectMemberId.')
   }
-}, async ({ text, projectOverrides = {} }) => {
+}, withAuthRequiredHandling(async ({ text, projectOverrides = {} }) => {
   prunePreviewCache(previews);
   const preview = await previewLogworkBatch({ text, projectOverrides });
   setCachedPreview(previews, preview);
   return formatToolResponse(preview);
-});
+}));
 
 server.registerTool('apply_logwork_batch', {
   description: 'Submit an approved logwork preview. Requires confirm: true and blocks unresolved entries.',
@@ -47,7 +49,7 @@ server.registerTool('apply_logwork_batch', {
     allowUnbooked: z.boolean().optional().describe('Allow submitting entries resolved to a valid project membership without a booking for that date.'),
     projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Final map from preview entry id to projectMemberId.')
   }
-}, async ({ batchId, batch, confirm, allowUnbooked = false, projectOverrides = {} }) => {
+}, withAuthRequiredHandling(async ({ batchId, batch, confirm, allowUnbooked = false, projectOverrides = {} }) => {
   prunePreviewCache(previews);
   const approvedBatch = batch || getCachedPreview(previews, batchId);
   if (!approvedBatch) {
@@ -64,7 +66,7 @@ server.registerTool('apply_logwork_batch', {
     previews.delete(batchId);
   }
   return formatToolResponse(result);
-});
+}));
 
 server.registerTool('query_logwork', {
   description: 'Read-only query for logged/booked Resource Optimiser work by date, range, and optional project filter.',
@@ -76,7 +78,7 @@ server.registerTool('query_logwork', {
     project: z.union([z.string(), z.number()]).optional().describe('Project filter by projectMemberId, projectId, name, ticket prefix, or mapping keyword.'),
     includeEntries: z.boolean().optional().describe('Whether to include task-level log entries. Defaults to true.')
   }
-}, async ({ date, from, to, period, project, includeEntries = true }) => {
+}, withAuthRequiredHandling(async ({ date, from, to, period, project, includeEntries = true }) => {
   const result = await queryLogwork({
     date,
     from,
@@ -86,15 +88,15 @@ server.registerTool('query_logwork', {
     includeEntries
   });
   return formatToolResponse(result);
-});
+}));
 
 server.registerTool('list_logwork_projects', {
   description: 'List Resource Optimiser project memberships and current local logwork project mappings without changing data.',
   inputSchema: {}
-}, async () => {
+}, withAuthRequiredHandling(async () => {
   const result = await listLogworkProjects();
   return formatToolResponse(result);
-});
+}));
 
 server.registerTool('upsert_project_mapping', {
   description: 'Create or update a local ticket/keyword-to-project mapping after explicit user approval.',
@@ -106,7 +108,7 @@ server.registerTool('upsert_project_mapping', {
     scope: z.enum(['user', 'project']).optional().describe('Where to write the mapping. Defaults to user: ~/.logwork-helper/.logwork-helper.json.'),
     confirm: z.boolean().describe('Must be true after explicit user approval because this writes .logwork-helper.json.')
   }
-}, async ({ projectMemberId, projectName, tickets, keywords = [], scope = 'user', confirm }) => {
+}, withAuthRequiredHandling(async ({ projectMemberId, projectName, tickets, keywords = [], scope = 'user', confirm }) => {
   const result = await upsertProjectMapping({
     projectMemberId,
     projectName,
@@ -115,6 +117,14 @@ server.registerTool('upsert_project_mapping', {
     scope,
     confirm
   });
+  return formatToolResponse(result);
+}));
+
+server.registerTool('start_auth_login', {
+  description: 'Open a macOS Terminal Resource Optimiser auth login session. No credentials are accepted by this MCP tool.',
+  inputSchema: {}
+}, async () => {
+  const result = await startAuthLoginTerminal();
   return formatToolResponse(result);
 });
 
@@ -167,6 +177,19 @@ export function prunePreviewCache(cache, now = Date.now()) {
     }
     cache.delete(oldestBatchId);
   }
+}
+
+function withAuthRequiredHandling(handler) {
+  return async (args) => {
+    try {
+      return await handler(args);
+    } catch (error) {
+      if (isAuthRequiredError(error)) {
+        return formatToolResponse(authRequiredPayload(error));
+      }
+      throw error;
+    }
+  };
 }
 
 function isMainModule() {
