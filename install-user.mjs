@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { promises as fs } from 'node:fs';
+import { constants as fsConstants, promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { dirname, join, relative, resolve } from 'node:path';
+import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMainModule } from './lib/entrypoint.mjs';
 import { helperHome } from './lib/paths.mjs';
@@ -16,13 +16,34 @@ async function main() {
   const options = parseSetupUserArgs(process.argv.slice(2));
   const sourceDir = dirname(fileURLToPath(import.meta.url));
   const targetDir = helperHome();
-  await fs.mkdir(targetDir, { recursive: true });
+  await installUserRuntime({ options, sourceDir, targetDir });
+}
+
+export async function installUserRuntime({
+  options,
+  sourceDir,
+  targetDir,
+  mkdirFn = fs.mkdir,
+  copyFn = copyDirectory,
+  installFn = installDependencies,
+  linkFn = linkGlobalBinaries,
+  authFn = maybeRunAuthLogin,
+  printFn = printMcpInstructions
+}) {
+  await mkdirFn(targetDir, { recursive: true });
   if (resolve(sourceDir) !== resolve(targetDir)) {
-    await copyDirectory(sourceDir, targetDir, sourceDir);
+    await copyFn(sourceDir, targetDir, sourceDir);
   }
-  await installDependencies(targetDir);
-  const authResult = await maybeRunAuthLogin(targetDir, options);
-  printMcpInstructions(targetDir, authResult);
+  await installFn(targetDir);
+  const linkResult = await linkFn(targetDir);
+  const authResult = await authFn(targetDir, options);
+  await printFn(targetDir, authResult, linkResult);
+
+  return {
+    targetDir,
+    authResult,
+    linkResult
+  };
 }
 
 async function copyDirectory(sourceDir, targetDir, rootDir) {
@@ -52,26 +73,26 @@ async function copyDirectory(sourceDir, targetDir, rootDir) {
 }
 
 function installDependencies(targetDir) {
+  return resolveInstallArgs(targetDir)
+    .then((args) => runCommand('npm', args, {
+      cwd: targetDir,
+      stdio: 'inherit'
+    }));
+}
+
+function runCommand(command, args, options = {}) {
   return new Promise((resolveValue, reject) => {
-    const command = 'npm';
-    resolveInstallArgs(targetDir)
-      .then((args) => {
-        const child = spawn(command, args, {
-          cwd: targetDir,
-          stdio: 'inherit'
-        });
+    const child = spawn(command, args, options);
 
-        child.on('error', reject);
-        child.on('close', (code) => {
-          if (code === 0) {
-            resolveValue();
-            return;
-          }
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolveValue();
+        return;
+      }
 
-          reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}.`));
-        });
-      })
-      .catch(reject);
+      reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}.`));
+    });
   });
 }
 
@@ -85,6 +106,48 @@ async function resolveInstallArgs(targetDir) {
     }
     return ['install', '--omit=dev'];
   }
+}
+
+export async function linkGlobalBinaries(targetDir, {
+  runner = runCommand,
+  commandFinder = findCommandOnPath
+} = {}) {
+  try {
+    await runner('npm', ['link', '--global'], {
+      cwd: targetDir,
+      stdio: 'inherit'
+    });
+  } catch (error) {
+    return {
+      linked: false,
+      commandAvailable: false,
+      error: error.message
+    };
+  }
+
+  const commandAvailable = await commandFinder('logwork');
+  return {
+    linked: true,
+    commandAvailable,
+    warning: commandAvailable
+      ? null
+      : '`logwork` was linked, but it is not visible on PATH in this shell.'
+  };
+}
+
+async function findCommandOnPath(commandName) {
+  const pathEntries = (process.env.PATH || '').split(delimiter).filter(Boolean);
+  for (const pathEntry of pathEntries) {
+    const candidate = resolve(pathEntry, commandName);
+    try {
+      await fs.access(candidate, fsConstants.X_OK);
+      return true;
+    } catch {
+      // Keep searching PATH.
+    }
+  }
+
+  return false;
 }
 
 export function parseSetupUserArgs(args = []) {
@@ -173,9 +236,11 @@ function runAuthLogin(targetDir) {
   });
 }
 
-function printMcpInstructions(targetDir, authResult = null) {
+function printMcpInstructions(targetDir, authResult = null, linkResult = null) {
   const serverPath = resolve(targetDir, 'mcp-server.mjs');
   console.log(`\nLogwork Helper installed to ${targetDir}.\n`);
+  console.log(formatTerminalCommandInstructions(linkResult));
+  console.log('');
   if (authResult?.ok) {
     console.log('Resource Optimiser authentication completed.');
     console.log('');
@@ -211,6 +276,36 @@ function printMcpInstructions(targetDir, authResult = null) {
   }, null, 2));
   console.log('\nOptional Git hook install:');
   console.log(`  ${resolve(targetDir, 'setup.sh')} /path/to/project-repo`);
+}
+
+export function formatTerminalCommandInstructions(linkResult = null) {
+  const commands = [
+    'Terminal commands installed:',
+    '  logwork',
+    '  logwork-helper auth login',
+    '  logwork-helper mcp'
+  ];
+
+  if (!linkResult || (linkResult.linked === true && linkResult.commandAvailable === true)) {
+    return commands.join('\n');
+  }
+
+  if (linkResult.linked === true && linkResult.commandAvailable === false) {
+    return [
+      ...commands,
+      '',
+      `Warning: ${linkResult.warning}`,
+      'If `logwork` is not found, open a new terminal or ensure npm global bin is on PATH.'
+    ].join('\n');
+  }
+
+  return [
+    'Terminal command link did not complete.',
+    `Reason: ${linkResult.error}`,
+    '',
+    'Fallback:',
+    '  npm install -g logwork-helper'
+  ].join('\n');
 }
 
 if (isMainModule(import.meta.url)) {

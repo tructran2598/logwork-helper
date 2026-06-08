@@ -6,7 +6,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseLoginArgs } from '../auth-cli.mjs';
-import { parseSetupUserArgs } from '../install-user.mjs';
+import {
+  formatTerminalCommandInstructions,
+  installUserRuntime,
+  linkGlobalBinaries,
+  parseSetupUserArgs
+} from '../install-user.mjs';
 import { isMainModule } from '../lib/entrypoint.mjs';
 import { parseManualArgs } from '../manual-log.mjs';
 
@@ -116,6 +121,78 @@ test('setup-user parser supports login flags', () => {
   assert.deepEqual(parseSetupUserArgs(['--no-login']), { loginMode: 'skip' });
   assert.deepEqual(parseSetupUserArgs([]), { loginMode: 'prompt' });
   assert.throws(() => parseSetupUserArgs(['--unknown']), /Unknown setup-user option/);
+});
+
+test('setup-user runtime installs dependencies before linking global binaries', async () => {
+  const calls = [];
+  let printedLinkResult = null;
+
+  await installUserRuntime({
+    options: { loginMode: 'skip' },
+    sourceDir: '/tmp/source-logwork-helper',
+    targetDir: '/tmp/target-logwork-helper',
+    mkdirFn: async () => calls.push('mkdir'),
+    copyFn: async () => calls.push('copy'),
+    installFn: async () => calls.push('install'),
+    linkFn: async () => {
+      calls.push('link');
+      return {
+        linked: true,
+        commandAvailable: true
+      };
+    },
+    authFn: async () => {
+      calls.push('auth');
+      return null;
+    },
+    printFn: async (targetDir, authResult, linkResult) => {
+      calls.push('print');
+      printedLinkResult = linkResult;
+    }
+  });
+
+  assert.deepEqual(calls, ['mkdir', 'copy', 'install', 'link', 'auth', 'print']);
+  assert.deepEqual(printedLinkResult, {
+    linked: true,
+    commandAvailable: true
+  });
+});
+
+test('global binary link failure is reported without throwing', async () => {
+  const result = await linkGlobalBinaries('/tmp/logwork-helper', {
+    runner: async () => {
+      throw new Error('EACCES: permission denied');
+    },
+    commandFinder: async () => true
+  });
+
+  assert.equal(result.linked, false);
+  assert.equal(result.commandAvailable, false);
+  assert.match(result.error, /EACCES/);
+});
+
+test('global binary link warns when logwork is not visible on PATH', async () => {
+  const result = await linkGlobalBinaries('/tmp/logwork-helper', {
+    runner: async () => {},
+    commandFinder: async () => false
+  });
+
+  assert.equal(result.linked, true);
+  assert.equal(result.commandAvailable, false);
+  assert.match(result.warning, /not visible on PATH/);
+});
+
+test('setup-user output explains terminal commands and fallback install', () => {
+  assert.match(formatTerminalCommandInstructions({
+    linked: true,
+    commandAvailable: true
+  }), /Terminal commands installed:\n  logwork\n  logwork-helper auth login/);
+
+  assert.match(formatTerminalCommandInstructions({
+    linked: false,
+    commandAvailable: false,
+    error: 'EACCES'
+  }), /Fallback:\n  npm install -g logwork-helper/);
 });
 
 test('manual parser defaults to REPL and keeps quick compatibility', () => {

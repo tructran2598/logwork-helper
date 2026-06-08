@@ -9,11 +9,13 @@ Logwork Helper is designed for Cursor, Codex, Google Antigravity, GitHub Copilot
 
 ## Quick Start
 
-1. Install the helper:
+1. Install the helper and terminal commands:
 
 ```bash
 npx -y logwork-helper setup-user
 ```
+
+This installs the runtime into `~/.logwork-helper` and links the `logwork` / `logwork-helper` commands globally.
 
 2. Authenticate Resource Optimiser:
 
@@ -60,7 +62,7 @@ yarn global add logwork-helper
 logwork-helper setup-user
 ```
 
-The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, then prints ready-to-paste MCP configs using your actual macOS path.
+The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, links the `logwork` and `logwork-helper` terminal commands globally with `npm link --global`, then prints ready-to-paste MCP configs using your actual macOS path.
 
 To install and start auth immediately:
 
@@ -427,6 +429,7 @@ The manual REPL uses the same safety model as MCP: preview first, explicit confi
 ## Troubleshooting
 
 - **IDE does not show tools**: restart/reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs`.
+- **`logwork: command not found` after `setup-user`**: open a new terminal first. If it still fails, run `npm install -g logwork-helper` or ensure your npm global bin directory is on `PATH`.
 - **`query_logwork` or `allowUnbooked` missing**: reload the MCP tool cache or restart the IDE.
 - **Not authenticated**: run `logwork-helper auth login`, or ask the assistant to call `start_auth_login`; enter secrets only in Terminal.
 - **Auth error after 2FA**: retry `logwork-helper auth login`. If it still fails, do not paste raw tokens/cookies/passwords; share only sanitized error messages.
