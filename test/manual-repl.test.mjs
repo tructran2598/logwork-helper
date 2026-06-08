@@ -40,7 +40,9 @@ import {
   saveManualDraft
 } from '../lib/manual-drafts.mjs';
 import {
+  AuthPrompt,
   CurrentPanel,
+  createInkCredentialProvider,
   DatePicker,
   DraftPicker,
   HeaderBar,
@@ -94,6 +96,42 @@ test('Ink manual components render shell, current panel, pickers, menu, status, 
     dryRun: true,
     wizard: { step: 'edit_tasks' }
   })), /mode: edit-tasks · preview: ready · 1 entries · DRY RUN/);
+  assert.match(renderToString(h(StatusBar, {
+    preview: null,
+    dryRun: false,
+    wizard: null,
+    authPrompt: { step: 'credentials' }
+  })), /mode: auth-credentials/);
+  const authPasswordOutput = renderToString(h(AuthPrompt, {
+    prompt: { step: 'credentials', field: 'password', email: 'malco' },
+    inputValue: 'secret-password',
+    onInputChange() {},
+    onPromptChange() {},
+    onResolve() {},
+    onReject() {}
+  }));
+  assert.match(authPasswordOutput, /password/);
+  assert.doesNotMatch(authPasswordOutput, /secret-password/);
+  const authOtpOutput = renderToString(h(AuthPrompt, {
+    prompt: { step: 'otp' },
+    inputValue: '123456',
+    onInputChange() {},
+    onPromptChange() {},
+    onResolve() {},
+    onReject() {}
+  }));
+  assert.match(authOtpOutput, /2FA/);
+  assert.doesNotMatch(authOtpOutput, /123456/);
+  assert.match(renderToString(h(AuthPrompt, {
+    prompt: {
+      step: 'device',
+      selectedIndex: 0,
+      devices: [{ label: 'iPhone' }, { label: '14 PRM' }]
+    },
+    onPromptChange() {},
+    onResolve() {},
+    onReject() {}
+  })), /Choose 2FA device/);
   assert.match(renderToString(h(DatePicker, {
     options: buildWeekDateOptions(weeklyLogwork()),
     selectedIndex: 0,
@@ -157,6 +195,66 @@ test('Ink manual components render shell, current panel, pickers, menu, status, 
     onStartNew() {},
     onCancel() {}
   })), /Start new logwork session/);
+});
+
+test('Ink credential provider resolves auth steps without clack prompts', async () => {
+  const prompts = [];
+  const panels = [];
+  const inputValues = [];
+  const selectedIndexes = [];
+  const resolverRef = { current: null };
+  const rejecterRef = { current: null };
+  const provider = createInkCredentialProvider({
+    resolverRef,
+    rejecterRef,
+    setAuthPrompt(prompt) {
+      prompts.push(prompt);
+    },
+    setActivePanel(panel) {
+      panels.push(panel);
+    },
+    setInputValue(value) {
+      inputValues.push(value);
+    },
+    setSelectedIndex(value) {
+      selectedIndexes.push(value);
+    }
+  });
+
+  const credentialsPromise = provider.requestCredentials();
+  assert.equal(prompts.at(-1).step, 'credentials');
+  assert.equal(prompts.at(-1).field, 'email');
+  assert.match(panels.at(-1).text, /email and password/);
+  resolverRef.current({
+    email: 'malco',
+    password: 'not-printed'
+  });
+  assert.deepEqual(await credentialsPromise, {
+    email: 'malco',
+    password: 'not-printed'
+  });
+
+  const singleDevice = { label: 'Only phone', credentialId: 'one' };
+  assert.equal(await provider.requestDeviceSelection([singleDevice]), singleDevice);
+
+  const devices = [
+    { label: 'iPhone', credentialId: 'a' },
+    { label: '14 PRM', credentialId: 'b' }
+  ];
+  const devicePromise = provider.requestDeviceSelection(devices);
+  assert.equal(prompts.at(-1).step, 'device');
+  assert.equal(prompts.at(-1).devices, devices);
+  resolverRef.current(devices[1]);
+  assert.equal(await devicePromise, devices[1]);
+
+  const otpPromise = provider.requestOtp();
+  assert.equal(prompts.at(-1).step, 'otp');
+  resolverRef.current('123456');
+  assert.equal(await otpPromise, '123456');
+
+  assert.ok(inputValues.every((value) => value === ''));
+  assert.ok(selectedIndexes.every((value) => value === 0));
+  assert.doesNotMatch(JSON.stringify(panels), /not-printed|123456/);
 });
 
 test('parseManualCommand supports visible commands and rejects exit aliases', () => {

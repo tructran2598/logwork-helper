@@ -4,7 +4,9 @@ import {
   authenticateWithApi,
   buildKeycloakAuthorizeUrl,
   exchangeSigninKeycloak,
+  exchangeSigninKeycloakSession,
   extractRoToken,
+  extractRoSession,
   parseHtmlForms,
   selectNextKeycloakForm
 } from '../lib/api-auth.mjs';
@@ -243,9 +245,22 @@ test('authenticateWithApi reports safe diagnostics when Keycloak returns no supp
 
 test('extractRoToken ignores Keycloak-shaped objects unless final token field is present', () => {
   const token = makeRoJwt({ id: 115, exp: futureExp() });
+  const refreshToken = makeRoJwt({ id: 115, exp: futureExp() + 600 });
   assert.equal(extractRoToken({ data: { user: { token } } }), token);
   assert.equal(extractRoToken({ data: { auth: { accessToken: token } } }), token);
   assert.equal(extractRoToken({ result: { session: { jwt: token } } }), token);
+  assert.deepEqual(extractRoSession({
+    data: {
+      auth: {
+        accessToken: token,
+        refreshToken
+      }
+    }
+  }), {
+    accessToken: token,
+    refreshToken
+  });
+  assert.equal(extractRoSession({ refreshToken }), null);
   assert.equal(extractRoToken({ accessToken: makeKeycloakJwt() }), null);
   assert.equal(extractRoToken({ nope: 'missing' }), null);
 });
@@ -271,6 +286,36 @@ test('exchangeSigninKeycloak accepts Resource Optimiser token from authorization
     signinKeycloakPath: '/auth/signinKeyCloak',
     accessToken: 'keycloak-token'
   }), token);
+});
+
+test('exchangeSigninKeycloakSession returns Resource Optimiser access and refresh tokens', async () => {
+  const accessToken = makeRoJwt({ id: 115, email: 'user@example.com', exp: futureExp() });
+  const refreshToken = makeRoJwt({ id: 115, email: 'user@example.com', exp: futureExp() + 600 });
+  const session = {
+    async request() {
+      return {
+        status: 200,
+        headers: new Headers(),
+        body: JSON.stringify({
+          data: {
+            auth: {
+              accessToken,
+              refreshToken
+            }
+          }
+        })
+      };
+    }
+  };
+
+  assert.deepEqual(await exchangeSigninKeycloakSession(session, {
+    apiBase: 'https://api.resourceoptimiser.com/api/v1',
+    signinKeycloakPath: '/auth/signinKeyCloak',
+    accessToken: 'keycloak-token'
+  }), {
+    accessToken,
+    refreshToken
+  });
 });
 
 test('exchangeSigninKeycloak reports sanitized diagnostics without leaking tokens', async () => {

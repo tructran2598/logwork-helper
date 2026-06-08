@@ -12,6 +12,7 @@ export const CONFIG = {
   memberLogtimeMethod: 'PATCH',
   timesheetPath: '/member-logtime/timesheet',
   signinKeycloakPath: '/auth/signinKeyCloak',
+  refreshTokenPath: '/auth/refresh-token',
   keycloakAuthUrl: 'https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/auth',
   keycloakTokenUrl: 'https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/token',
   keycloakClientId: 'localhost',

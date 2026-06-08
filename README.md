@@ -74,7 +74,7 @@ Use `--no-login` when installing in scripts or CI.
 
 ## Auth Setup
 
-Logwork Helper does not accept or store Bearer tokens in config files. Login is API-only: the helper creates a fresh Keycloak OIDC authorize session, asks for email/password/device/2FA in the terminal, exchanges the authorization code, calls Resource Optimiser `signinKeyCloak`, and stores only the final Resource Optimiser API token in macOS Keychain.
+Logwork Helper does not accept or store Bearer tokens in config files. Login is API-only: the helper creates a fresh Keycloak OIDC authorize session, asks for email/password/device/2FA in the terminal, exchanges the authorization code, calls Resource Optimiser `signinKeyCloak`, and stores only the final Resource Optimiser access/refresh token session in macOS Keychain.
 
 Start login:
 
@@ -90,7 +90,7 @@ What happens:
 4. You enter the 2FA code in the terminal.
 5. The helper exchanges the Keycloak authorization code.
 6. The helper calls Resource Optimiser `signinKeyCloak`.
-7. The helper stores the Resource Optimiser API token in macOS Keychain.
+7. The helper stores the Resource Optimiser access/refresh token session in macOS Keychain.
 
 Check auth status without printing the token:
 
@@ -110,7 +110,7 @@ Auth notes:
 - Password and 2FA are never stored.
 - Keycloak URLs contain dynamic `state`, `nonce`, `execution`, and `tab_id` values. Do not hardcode or paste them into config.
 - Keycloak access tokens are intermediate only and are not stored.
-- Only the final Resource Optimiser API token is stored in macOS Keychain.
+- Only the final Resource Optimiser access/refresh token session is stored in macOS Keychain.
 
 ### Auth Security Flow
 
@@ -121,8 +121,8 @@ flowchart TD
   C --> D["Helper exchanges Keycloak authorization code"]
   D --> E["Helper calls Resource Optimiser signinKeyCloak"]
   E --> F["Helper validates JWT expiry and user id"]
-  F --> G["Final RO token saved to macOS Keychain"]
-  G --> H["MCP tools call Resource Optimiser APIs with the local Keychain token"]
+  F --> G["Final RO access/refresh session saved to macOS Keychain"]
+  G --> H["MCP tools call Resource Optimiser APIs with the local Keychain session"]
 
   I["MCP config"] -. "no token" .-> H
   J[".logwork-helper.json"] -. "project mapping only" .-> H
@@ -327,7 +327,7 @@ Security model:
 - Password and 2FA are never stored.
 - Email may be remembered in macOS Keychain to prefill the next login.
 - Keycloak access tokens are intermediate only and are not stored.
-- The final Resource Optimiser API token is stored in macOS Keychain.
+- The final Resource Optimiser access/refresh token session is stored in macOS Keychain.
 - Token is not stored in MCP config.
 - Token is not stored in `.logwork-helper.json`.
 - Auth does not open or read any browser profile.
