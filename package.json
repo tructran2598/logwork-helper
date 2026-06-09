@@ -1,6 +1,6 @@
 {
   "name": "logwork-helper",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Local MCP server for querying, previewing, and submitting Resource Optimiser logwork.",
   "license": "UNLICENSED",
   "type": "module",
@@ -27,6 +27,7 @@
     "auth-cli.mjs",
     "cli.mjs",
     "config.mjs",
+    "diagnostics-cli.mjs",
     "install-user.mjs",
     "install.mjs",
     "logwork-helper.mjs",

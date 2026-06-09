@@ -36,6 +36,15 @@ Options:
 
 Authentication uses the Resource Optimiser / Keycloak API flow and does not open a browser.`
   }],
+  ['diagnostics', {
+    script: 'diagnostics-cli.mjs',
+    description: 'Write a sanitized support diagnostics report.',
+    help: `Usage:
+  logwork-helper diagnostics
+
+Writes a sanitized support report under ~/.logwork-helper/diagnostics.
+Send only the generated file to developers; do not send raw curl logs, cookies, passwords, OTPs, or tokens.`
+  }],
   ['manual', {
     script: 'manual-log.mjs',
     description: 'Open the manual terminal logwork REPL.',
@@ -56,6 +65,7 @@ Commands inside the REPL:
   /projects
   /projects 5234
   /map SCB 5234
+  /diagnostics
   Press Esc to exit`
   }],
   ['log', {
@@ -137,6 +147,7 @@ function printHelp() {
   console.log(`Usage:
   logwork-helper setup-user
   logwork-helper auth login
+  logwork-helper diagnostics
   logwork-helper mcp
   logwork
   logwork-helper manual

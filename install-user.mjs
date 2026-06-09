@@ -113,7 +113,7 @@ export async function linkGlobalBinaries(targetDir, {
   commandFinder = findCommandOnPath
 } = {}) {
   try {
-    await runner('npm', ['link', '--global'], {
+    await runner('npm', ['link'], {
       cwd: targetDir,
       stdio: 'inherit'
     });

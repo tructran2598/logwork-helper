@@ -82,7 +82,7 @@ test('parseHtmlForms finds Keycloak credential, device, and OTP forms', () => {
       <input type="text" name="otp">
     </form>
   `, undefined, { preferDevice: true });
-  assert.equal(mixedBeforeDeviceSubmit.kind, 'device');
+  assert.equal(mixedBeforeDeviceSubmit.kind, 'otp');
 
   const otpPreferredOverDevice = selectNextKeycloakForm(`
     <form action="/device" method="post">
@@ -113,6 +113,7 @@ test('parseHtmlForms finds Keycloak credential, device, and OTP forms', () => {
 test('authenticateWithApi submits credentials, device, OTP, token exchange, and signinKeyCloak', async () => {
   const finalToken = makeJwt({ id: 115, exp: futureExp() });
   const requests = [];
+  const events = [];
   let devicePromptCount = 0;
   let otpPromptCount = 0;
   const responses = [
@@ -134,6 +135,11 @@ test('authenticateWithApi submits credentials, device, OTP, token exchange, and 
 
   const token = await authenticateWithApi({
     fetchImpl,
+    diagnosticsRecorder: {
+      event(name, details) {
+        events.push({ name, details });
+      }
+    },
     credentialProvider: {
       async requestCredentials() {
         return {
@@ -167,6 +173,138 @@ test('authenticateWithApi submits credentials, device, OTP, token exchange, and 
   assert.equal(requests[4].url, 'https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/token');
   assert.equal(requests[4].body.includes('code=auth-code'), true);
   assert.match(requests[5].url, /\/api\/v1\/auth\/signinKeyCloak$/);
+  assert.deepEqual(events.map((event) => event.name), [
+    'authorize_request',
+    'authorize_response',
+    'keycloak_form_detected',
+    'credentials_submit_result',
+    'keycloak_form_detected',
+    'device_submit_result',
+    'keycloak_form_detected',
+    'otp_submit_result',
+    'authorization_code_received',
+    'keycloak_token_response',
+    'signin_keycloak_response'
+  ]);
+  assert.equal(events[0].details.host, 'keycloak.vinova.sg');
+  assert.equal(events[0].details.path, '/auth/realms/resource/protocol/openid-connect/auth');
+  assert.deepEqual(events.at(-2).details.jsonKeys, ['access_token']);
+  assert.deepEqual(events.at(-1).details.jsonKeys, ['accessToken']);
+});
+
+test('authenticateWithApi submits mixed OTP and device form in one request', async () => {
+  const finalToken = makeJwt({ id: 115, exp: futureExp() });
+  const requests = [];
+  const events = [];
+  let devicePromptCount = 0;
+  let otpPromptCount = 0;
+  const responses = [
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate?session_code=s1&execution=e1&tab_id=t1" method="post"><input name="username"><input name="password" type="password"><input name="credentialId" value=""></form>`),
+    htmlResponse(`
+      <form action="https://keycloak.vinova.sg/auth/realms/resource/login-actions/authenticate?session_code=s2&execution=e2&tab_id=t2" method="post">
+        <input type="radio" id="device-m" name="credentialId" value="m">
+        <label for="device-m">m</label>
+        <input type="radio" id="device-aa" name="credentialId" value="aa">
+        <label for="device-aa">aa</label>
+        <input name="otp">
+      </form>
+    `),
+    redirectResponse('https://app.resourceoptimiser.com/vinova/check-login#code=auth-code&state=state-value'),
+    jsonResponse({ access_token: makeJwt({ sub: 'keycloak-user', exp: futureExp() }) }),
+    jsonResponse({ accessToken: finalToken })
+  ];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({
+      url: String(url),
+      method: options.method || 'GET',
+      body: String(options.body || '')
+    });
+    return responses.shift();
+  };
+
+  const token = await authenticateWithApi({
+    fetchImpl,
+    diagnosticsRecorder: {
+      event(name, details) {
+        events.push({ name, details });
+      }
+    },
+    credentialProvider: {
+      async requestCredentials() {
+        return {
+          email: 'user@example.com',
+          password: 'secret-password'
+        };
+      },
+      async requestDeviceSelection(devices) {
+        devicePromptCount += 1;
+        assert.deepEqual(devices.map((device) => device.label), ['m', 'aa']);
+        return devices[1];
+      },
+      async requestOtp() {
+        otpPromptCount += 1;
+        return '654321';
+      }
+    }
+  });
+
+  assert.equal(token, finalToken);
+  assert.equal(devicePromptCount, 1);
+  assert.equal(otpPromptCount, 1);
+  assert.equal(requests[2].body.includes('credentialId=aa'), true);
+  assert.equal(requests[2].body.includes('otp=654321'), true);
+  assert.equal(requests[2].body.includes('credentialId=m'), false);
+  assert.equal(events.some((event) => event.name === 'device_submit_result'), false);
+  const otpSubmit = events.find((event) => event.name === 'otp_submit_result');
+  assert.equal(otpSubmit.details.otpFormHasDevices, true);
+  assert.equal(otpSubmit.details.selectedDeviceSubmitted, true);
+});
+
+test('authenticateWithApi records repeated OTP page without leaking OTP', async () => {
+  const events = [];
+  let otpPromptCount = 0;
+  const responses = [
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate?session_code=s1&execution=e1&tab_id=t1" method="post"><input name="username"><input name="password" type="password"></form>`),
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate?session_code=s2&execution=e2&tab_id=t2" method="post"><input type="radio" id="phone" name="credentialId" value="phone"><label for="phone">Phone</label></form>`),
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate?session_code=s3&execution=e3&tab_id=t3" method="post"><input name="otp"></form>`),
+    htmlResponse(`<html><head><title>OTP failed</title></head><body><form action="/auth/realms/resource/login-actions/authenticate?session_code=s4&execution=e4&tab_id=t4" method="post"><input name="otp"></form><p>Invalid authenticator code.</p></body></html>`)
+  ];
+
+  await assert.rejects(
+    authenticateWithApi({
+      fetchImpl: async () => responses.shift(),
+      diagnosticsRecorder: {
+        event(name, details) {
+          events.push({ name, details });
+        }
+      },
+      credentialProvider: {
+        async requestCredentials() {
+          return {
+            email: 'user@example.com',
+            password: 'secret-password'
+          };
+        },
+        async requestDeviceSelection(devices) {
+          return devices[0];
+        },
+        async requestOtp() {
+          otpPromptCount += 1;
+          if (otpPromptCount > 1) {
+            throw new Error('stop after reprompt');
+          }
+          return '654321';
+        }
+      }
+    }),
+    /stop after reprompt/
+  );
+
+  assert.equal(events.some((event) => event.name === 'otp_reprompt'), true);
+  const serialized = JSON.stringify(events);
+  assert.equal(serialized.includes('654321'), false);
+  assert.equal(serialized.includes('secret-password'), false);
+  assert.equal(serialized.includes('session_code=s4'), false);
 });
 
 test('authenticateWithApi stops repeated Keycloak device form loops safely', async () => {

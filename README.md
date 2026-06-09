@@ -62,7 +62,7 @@ yarn global add logwork-helper
 logwork-helper setup-user
 ```
 
-The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, links the `logwork` and `logwork-helper` terminal commands globally with `npm link --global`, then prints ready-to-paste MCP configs using your actual macOS path.
+The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, links the `logwork` and `logwork-helper` terminal commands with `npm link`, then prints ready-to-paste MCP configs using your actual macOS path.
 
 To install and start auth immediately:
 
@@ -128,6 +128,8 @@ flowchart TD
   J[".logwork-helper.json"] -. "project mapping only" .-> H
   K["AI chat / MCP args"] -. "no password or 2FA" .-> C
 ```
+
+
 
 ## MCP Setup
 
@@ -396,6 +398,7 @@ Useful commands inside the session:
 /projects
 /projects 5234
 /map SCB 5234
+/diagnostics
 ```
 
 `/logwork` opens a guided flow: pick a day in the current week, pick a Resource Optimiser project, then enter one task per line:
@@ -413,6 +416,7 @@ While the `task ›` prompt is active, type `/` to see task-only actions with de
 ```text
 /save     Save this draft locally
 /drafts   Resume or delete saved drafts
+/diagnostics Write a sanitized support report
 /remove   Select tasks to delete
 /edit     Select one task and replace it
 /clear    Clear current task list
@@ -430,9 +434,11 @@ The manual REPL uses the same safety model as MCP: preview first, explicit confi
 
 - **IDE does not show tools**: restart/reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs`.
 - **`logwork: command not found` after `setup-user`**: open a new terminal first. If it still fails, run `npm install -g logwork-helper` or ensure your npm global bin directory is on `PATH`.
+- **`npm error ELINKGLOBAL` during `setup-user`**: update to `logwork-helper@0.1.6` or newer, then rerun `npx -y logwork-helper setup-user`. The installer uses `npm link`, not `npm link --global`.
 - **`query_logwork` or `allowUnbooked` missing**: reload the MCP tool cache or restart the IDE.
 - **Not authenticated**: run `logwork-helper auth login`, or ask the assistant to call `start_auth_login`; enter secrets only in Terminal.
-- **Auth error after 2FA**: retry `logwork-helper auth login`. If it still fails, do not paste raw tokens/cookies/passwords; share only sanitized error messages.
+- **Auth error after 2FA**: retry `logwork-helper auth login`. If it still fails, run `logwork-helper diagnostics` and send only the generated sanitized report.
+- **Support needs logs**: run `logwork-helper diagnostics`; the report is saved under `~/.logwork-helper/diagnostics` and redacts tokens, cookies, passwords, OTPs, auth codes, and raw HTML.
 - **No project matched**: ask the assistant to call `list_logwork_projects`, choose the correct project, then call `upsert_project_mapping`.
 - **Do not paste Bearer tokens, cookies, passwords, OTPs, or raw curl auth logs**: auth is handled locally and MCP config should only contain `command` and `args`.
 

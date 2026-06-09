@@ -5,6 +5,8 @@ import {
   loginResourceOptimiser,
   logoutResourceOptimiser
 } from './lib/auth.mjs';
+import { authenticateWithApiSession } from './lib/api-auth.mjs';
+import { createAuthDiagnosticsRecorder } from './lib/auth-diagnostics.mjs';
 import { isMainModule } from './lib/entrypoint.mjs';
 
 async function main() {
@@ -22,9 +24,8 @@ async function main() {
 
   if (command === 'login') {
     parseLoginArgs(args);
-    console.log('Starting Resource Optimiser API auth. Secrets are requested in this terminal and are not stored.');
-    const result = await loginResourceOptimiser();
-    console.log(result.summary);
+    const result = await runLoginCommand();
+    process.exitCode = result.ok ? 0 : 1;
     return;
   }
 
@@ -42,6 +43,42 @@ async function main() {
   }
 
   throw new Error(`Unknown auth command: ${command}`);
+}
+
+export async function runLoginCommand({
+  login = loginResourceOptimiser,
+  createRecorder = createAuthDiagnosticsRecorder,
+  stdout = console.log,
+  stderr = console.error
+} = {}) {
+  stdout('Starting Resource Optimiser API auth. Secrets are requested in this terminal and are not stored.');
+  const diagnosticsRecorder = createRecorder();
+
+  try {
+    const result = await login({
+      authenticator: (options) => authenticateWithApiSession({
+        ...options,
+        diagnosticsRecorder
+      })
+    });
+    stdout(result.summary);
+    return {
+      ok: true,
+      result
+    };
+  } catch (error) {
+    stderr(error.message);
+    try {
+      const written = await diagnosticsRecorder.writeFailure(error);
+      stderr(`Auth failed. Sanitized diagnostics saved to ${written.path}. Attempt: ${written.attemptId}`);
+    } catch (writeError) {
+      stderr(`Auth failed. Unable to write sanitized diagnostics: ${writeError.message}`);
+    }
+    return {
+      ok: false,
+      error
+    };
+  }
 }
 
 function printHelp() {

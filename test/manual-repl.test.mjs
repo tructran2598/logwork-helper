@@ -60,6 +60,7 @@ const h = React.createElement;
 test('manual command registry renders help and slash suggestions', () => {
   assert.match(formatManualHelp(), /\/query today/);
   assert.match(formatManualHelp(), /\/logwork/);
+  assert.match(formatManualHelp(), /\/diagnostics/);
   assert.doesNotMatch(formatManualHelp(), /\/apply/);
   assert.doesNotMatch(formatManualHelp(), /\/exit|\/quit/);
   assert.doesNotMatch(formatManualHelp(), /\/preview/);
@@ -70,10 +71,11 @@ test('manual command registry renders help and slash suggestions', () => {
   assert.deepEqual(getCommandSuggestions('/e').map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/pre').map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/pro').map((command) => command.name), ['/projects']);
+  assert.deepEqual(getCommandSuggestions('/di').map((command) => command.name), ['/diagnostics']);
   assert.match(renderCommandSuggestions('/pro'), /\/projects\s+List projects with weekly booked\/logged chart/);
   assert.deepEqual(getCommandSuggestions('/a', TASK_COMMANDS).map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/s', TASK_COMMANDS).map((command) => command.name), ['/save']);
-  assert.deepEqual(getCommandSuggestions('/d', TASK_COMMANDS).map((command) => command.name), ['/drafts']);
+  assert.deepEqual(getCommandSuggestions('/d', TASK_COMMANDS).map((command) => command.name), ['/drafts', '/diagnostics']);
   assert.deepEqual(getCommandSuggestions('/e', TASK_COMMANDS).map((command) => command.name), ['/edit']);
   assert.match(renderCommandSuggestions('/re', 0, TASK_COMMANDS), /\/remove\s+Select tasks to delete/);
 });
@@ -281,6 +283,7 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
     type: 'logwork',
     text: undefined
   });
+  assert.deepEqual(parseManualCommand('/diagnostics'), { type: 'diagnostics' });
   assert.deepEqual(parseManualCommand('/apply'), { type: 'apply' });
   assert.deepEqual(parseManualCommand('/projects'), {
     type: 'projects',
@@ -319,6 +322,21 @@ test('manual query prints grouped logwork summary', async () => {
   await executeManualCommand(command, session, context({ workflows, printed }));
 
   assert.deepEqual(printed, ['Logwork from 2026-06-01 to 2026-06-08: 8h logged / 8h booked.']);
+});
+
+test('manual diagnostics writes support report summary', async () => {
+  const printed = [];
+  await executeManualCommand(parseManualCommand('/diagnostics'), createManualSession(), context({
+    printed,
+    workflows: {
+      generateDiagnosticsReport: async () => ({
+        summary: 'Diagnostics report written to /tmp/logwork-diagnostics.txt'
+      })
+    }
+  }));
+
+  assert.match(printed.join('\n'), /Diagnostics report written to \/tmp\/logwork-diagnostics\.txt/);
+  assert.match(printed.join('\n'), /Send this sanitized file/);
 });
 
 test('manual logwork fallback stores last preview from pasted text', async () => {
