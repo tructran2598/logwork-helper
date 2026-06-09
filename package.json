@@ -1,6 +1,6 @@
 {
   "name": "logwork-helper",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Local MCP server for querying, previewing, and submitting Resource Optimiser logwork.",
   "license": "UNLICENSED",
   "type": "module",

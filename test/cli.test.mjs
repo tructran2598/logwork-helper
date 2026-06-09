@@ -11,7 +11,8 @@ import {
   formatTerminalCommandInstructions,
   installUserRuntime,
   linkGlobalBinaries,
-  parseSetupUserArgs
+  parseSetupUserArgs,
+  sanitizeRuntimeMetadata
 } from '../install-user.mjs';
 import { isMainModule } from '../lib/entrypoint.mjs';
 import { parseManualArgs } from '../manual-log.mjs';
@@ -210,6 +211,7 @@ test('setup-user parser supports login flags', () => {
 test('setup-user runtime installs dependencies before linking global binaries', async () => {
   const calls = [];
   let printedLinkResult = null;
+  let printedCleanupResult = null;
 
   await installUserRuntime({
     options: { loginMode: 'skip' },
@@ -217,6 +219,10 @@ test('setup-user runtime installs dependencies before linking global binaries', 
     targetDir: '/tmp/target-logwork-helper',
     mkdirFn: async () => calls.push('mkdir'),
     copyFn: async () => calls.push('copy'),
+    cleanupFn: async () => {
+      calls.push('cleanup');
+      return { changed: false, changes: [] };
+    },
     installFn: async () => calls.push('install'),
     linkFn: async () => {
       calls.push('link');
@@ -229,17 +235,89 @@ test('setup-user runtime installs dependencies before linking global binaries', 
       calls.push('auth');
       return null;
     },
-    printFn: async (targetDir, authResult, linkResult) => {
+    printFn: async (targetDir, authResult, linkResult, cleanupResult) => {
       calls.push('print');
       printedLinkResult = linkResult;
+      printedCleanupResult = cleanupResult;
     }
   });
 
-  assert.deepEqual(calls, ['mkdir', 'copy', 'install', 'link', 'auth', 'print']);
+  assert.deepEqual(calls, ['mkdir', 'copy', 'cleanup', 'install', 'link', 'auth', 'print']);
   assert.deepEqual(printedLinkResult, {
     linked: true,
     commandAvailable: true
   });
+  assert.deepEqual(printedCleanupResult, {
+    changed: false,
+    changes: []
+  });
+});
+
+test('setup-user cleanup removes stale local self tarball dependencies', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'logwork-stale-metadata-'));
+  const packagePath = join(dir, 'package.json');
+  const lockPath = join(dir, 'package-lock.json');
+  const stale = 'file:logwork-helper-0.1.5.tgz';
+  await import('node:fs/promises').then(async ({ writeFile }) => {
+    await writeFile(packagePath, JSON.stringify({
+      name: 'logwork-helper',
+      dependencies: {
+        '@clack/prompts': '^1.5.0',
+        'logwork-helper': stale
+      }
+    }, null, 2));
+    await writeFile(lockPath, JSON.stringify({
+      name: 'logwork-helper',
+      packages: {
+        '': {
+          dependencies: {
+            '@clack/prompts': '^1.5.0',
+            'logwork-helper': stale
+          }
+        },
+        'node_modules/logwork-helper': {
+          version: stale
+        }
+      },
+      dependencies: {
+        'logwork-helper': {
+          version: stale
+        },
+        'node_modules/logwork-helper': {
+          version: stale
+        }
+      }
+    }, null, 2));
+  });
+
+  const result = await sanitizeRuntimeMetadata(dir);
+  const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+  const lockJson = JSON.parse(readFileSync(lockPath, 'utf8'));
+
+  assert.equal(result.changed, true);
+  assert.equal(packageJson.dependencies['logwork-helper'], undefined);
+  assert.equal(lockJson.packages[''].dependencies['logwork-helper'], undefined);
+  assert.equal(lockJson.packages['node_modules/logwork-helper'], undefined);
+  assert.equal(lockJson.dependencies['logwork-helper'], undefined);
+  assert.equal(lockJson.dependencies['node_modules/logwork-helper'], undefined);
+});
+
+test('setup-user cleanup leaves clean metadata unchanged', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'logwork-clean-metadata-'));
+  const packagePath = join(dir, 'package.json');
+  const text = JSON.stringify({
+    name: 'logwork-helper',
+    dependencies: {
+      '@clack/prompts': '^1.5.0'
+    }
+  }, null, 2);
+  await import('node:fs/promises').then(({ writeFile }) => writeFile(packagePath, text));
+
+  const result = await sanitizeRuntimeMetadata(dir);
+
+  assert.equal(result.changed, false);
+  assert.deepEqual(result.changes, []);
+  assert.equal(readFileSync(packagePath, 'utf8'), text);
 });
 
 test('global binary link failure is reported without throwing', async () => {

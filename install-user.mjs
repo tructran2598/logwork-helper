@@ -25,6 +25,7 @@ export async function installUserRuntime({
   targetDir,
   mkdirFn = fs.mkdir,
   copyFn = copyDirectory,
+  cleanupFn = sanitizeRuntimeMetadata,
   installFn = installDependencies,
   linkFn = linkGlobalBinaries,
   authFn = maybeRunAuthLogin,
@@ -34,15 +35,17 @@ export async function installUserRuntime({
   if (resolve(sourceDir) !== resolve(targetDir)) {
     await copyFn(sourceDir, targetDir, sourceDir);
   }
+  const cleanupResult = await cleanupFn(targetDir);
   await installFn(targetDir);
   const linkResult = await linkFn(targetDir);
   const authResult = await authFn(targetDir, options);
-  await printFn(targetDir, authResult, linkResult);
+  await printFn(targetDir, authResult, linkResult, cleanupResult);
 
   return {
     targetDir,
     authResult,
-    linkResult
+    linkResult,
+    cleanupResult
   };
 }
 
@@ -106,6 +109,80 @@ async function resolveInstallArgs(targetDir) {
     }
     return ['install', '--omit=dev'];
   }
+}
+
+export async function sanitizeRuntimeMetadata(targetDir, {
+  readFileFn = fs.readFile,
+  writeFileFn = fs.writeFile
+} = {}) {
+  const changes = [];
+  const packagePath = join(targetDir, 'package.json');
+  const packageLockPath = join(targetDir, 'package-lock.json');
+
+  await updateJsonFile(packagePath, {
+    readFileFn,
+    writeFileFn,
+    changes
+  }, (json) => {
+    if (isStaleSelfDependency(json.dependencies?.['logwork-helper'])) {
+      delete json.dependencies['logwork-helper'];
+      changes.push('package.json dependencies.logwork-helper');
+    }
+    return json;
+  });
+
+  await updateJsonFile(packageLockPath, {
+    readFileFn,
+    writeFileFn,
+    changes
+  }, (json) => {
+    if (isStaleSelfDependency(json.packages?.['']?.dependencies?.['logwork-helper'])) {
+      delete json.packages[''].dependencies['logwork-helper'];
+      changes.push('package-lock.json packages[""].dependencies.logwork-helper');
+    }
+    if (json.packages?.['node_modules/logwork-helper']) {
+      delete json.packages['node_modules/logwork-helper'];
+      changes.push('package-lock.json packages["node_modules/logwork-helper"]');
+    }
+    if (json.dependencies?.['node_modules/logwork-helper']) {
+      delete json.dependencies['node_modules/logwork-helper'];
+      changes.push('package-lock.json dependencies["node_modules/logwork-helper"]');
+    }
+    if (isStaleSelfDependency(json.dependencies?.['logwork-helper']?.version)) {
+      delete json.dependencies['logwork-helper'];
+      changes.push('package-lock.json dependencies.logwork-helper');
+    }
+    return json;
+  });
+
+  return {
+    changed: changes.length > 0,
+    changes
+  };
+}
+
+async function updateJsonFile(path, { readFileFn, writeFileFn }, update) {
+  let text;
+  try {
+    text = await readFileFn(path, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+
+  const json = JSON.parse(text);
+  const before = JSON.stringify(json);
+  const updated = update(json);
+  const after = JSON.stringify(updated);
+  if (before !== after) {
+    await writeFileFn(path, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
+  }
+}
+
+function isStaleSelfDependency(value) {
+  return typeof value === 'string' && /^file:.*logwork-helper.*\.tgz$/i.test(value);
 }
 
 export async function linkGlobalBinaries(targetDir, {
@@ -236,9 +313,13 @@ function runAuthLogin(targetDir) {
   });
 }
 
-function printMcpInstructions(targetDir, authResult = null, linkResult = null) {
+function printMcpInstructions(targetDir, authResult = null, linkResult = null, cleanupResult = null) {
   const serverPath = resolve(targetDir, 'mcp-server.mjs');
   console.log(`\nLogwork Helper installed to ${targetDir}.\n`);
+  if (cleanupResult?.changed) {
+    console.log('Removed stale local logwork-helper tarball dependency from runtime metadata.');
+    console.log('');
+  }
   console.log(formatTerminalCommandInstructions(linkResult));
   console.log('');
   if (authResult?.ok) {
