@@ -18,6 +18,28 @@ test('generateDiagnosticsReport writes sanitized support report', async () => {
   process.env.LOGWORK_HELPER_HOME = dir;
   try {
     await mkdir(dir, { recursive: true });
+    const cwd = join(dir, 'project');
+    await mkdir(cwd, { recursive: true });
+    await writeFile(join(dir, '.logwork-helper.json'), JSON.stringify({
+      projectMappings: [
+        {
+          projectName: 'Course Builder',
+          projectMemberId: 5234,
+          tickets: ['SCB'],
+          keywords: ['support keyword']
+        }
+      ]
+    }), 'utf8');
+    await writeFile(join(cwd, '.logwork-helper.json'), JSON.stringify({
+      projectMappings: [
+        {
+          projectName: 'Operations',
+          projectMemberId: 7777,
+          tickets: ['OPS'],
+          keywords: []
+        }
+      ]
+    }), 'utf8');
     await writeFile(join(dir, 'auth-debug.log'), JSON.stringify({
       password: 'secret-password',
       otp: '654321',
@@ -31,7 +53,7 @@ test('generateDiagnosticsReport writes sanitized support report', async () => {
     const result = await generateDiagnosticsReport({
       outputPath,
       now: () => new Date('2026-06-09T00:00:00.000Z'),
-      cwd: '/tmp/project',
+      cwd,
       commandFinder: async (command) => ({
         available: command === 'node',
         path: command === 'node' ? '/usr/bin/node' : null
@@ -58,6 +80,11 @@ test('generateDiagnosticsReport writes sanitized support report', async () => {
     assert.match(report, /Logwork Helper Diagnostics/);
     assert.match(report, /packageVersion:/);
     assert.match(report, /query_logwork/);
+    assert.match(report, /Config Snapshot/);
+    assert.match(report, /mappingCount: 2/);
+    assert.match(report, /"tickets":\["SCB"\]/);
+    assert.match(report, /"tickets":\["OPS"\]/);
+    assert.match(report, /projectConfig: exists/);
     assert.match(report, /Auth Status/);
     assert.doesNotMatch(report, /secret-password/);
     assert.doesNotMatch(report, /654321/);
