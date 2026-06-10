@@ -32,7 +32,32 @@ test('buildLogworkBatchPreview returns ready batch with totals', () => {
   });
   assert.deepEqual(preview.totalsByDate, { '2026-06-01': 3 });
   assert.deepEqual(preview.totalsByProject, { 'Course Builder': 3 });
+  assert.deepEqual(preview.approvalSummary, {
+    entryCount: 2,
+    totalHours: 3,
+    dateRange: { from: '2026-06-01', to: '2026-06-01' },
+    projectCount: 1,
+    projects: [
+      {
+        projectMemberId: 5352,
+        projectId: 1,
+        projectName: 'Course Builder',
+        hours: 3,
+        entries: 2,
+        unbookedEntries: 0,
+        unresolvedEntries: 0
+      }
+    ],
+    unresolvedEntries: 0,
+    unbookedEntries: 0,
+    requiresUserChoice: false,
+    requiresAllowUnbooked: false,
+    confirmRequired: true,
+    canApply: true
+  });
   assert.match(preview.summary, /via single_booked_project, confidence 0.95/);
+  assert.match(preview.summary, /Approval checklist: 2 entries, 3h total, 2026-06-01/);
+  assert.match(preview.summary, /Projects: Course Builder: 3h/);
 });
 
 test('buildLogworkBatchPreview marks mapped membership without booking as ready_with_unbooked', () => {
@@ -58,6 +83,9 @@ test('buildLogworkBatchPreview marks mapped membership without booking as ready_
   assert.equal(preview.entries[0].resolution.requiresAllowUnbooked, true);
   assert.equal(preview.entries[0].resolution.autoResolved, true);
   assert.equal(preview.entries[0].matchedProject.projectMemberId, 5234);
+  assert.equal(preview.approvalSummary.requiresAllowUnbooked, true);
+  assert.equal(preview.approvalSummary.canApply, true);
+  assert.equal(preview.approvalSummary.projects[0].unbookedEntries, 1);
   assert.match(preview.summary, /UNBOOKED: \+2h/);
 });
 
@@ -85,6 +113,9 @@ test('buildLogworkBatchPreview keeps ticket mapping conflicts unresolved', async
   assert.equal(preview.entries[0].reason, 'single_booked_project_conflicts_with_mapping');
   assert.equal(preview.entries[0].resolution.requiresUserChoice, true);
   assert.equal(preview.entries[0].resolution.autoResolved, false);
+  assert.equal(preview.approvalSummary.requiresUserChoice, true);
+  assert.equal(preview.approvalSummary.canApply, false);
+  assert.equal(preview.approvalSummary.projects[0].projectName, 'UNRESOLVED');
   assert.deepEqual(preview.entries[0].candidates.map((candidate) => candidate.source), [
     'config_ticket',
     'single_booked_project'
@@ -171,6 +202,16 @@ test('applyLogworkBatch submits one payload per line', async () => {
 
   assert.equal(result.status, 'submitted');
   assert.equal(result.dryRun, true);
+  assert.deepEqual(result.submissionSummary, {
+    entryCount: 2,
+    totalHours: 3,
+    dryRun: true,
+    dates: ['2026-06-01'],
+    projects: [
+      { projectName: 'Course Builder', hours: 3 }
+    ]
+  });
+  assert.match(result.summary, /Submitted 2 entries, 3h total/);
   assert.equal(payloads.length, 2);
   assert.deepEqual(payloads[0], {
     projectMemberId: 5352,

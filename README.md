@@ -282,7 +282,7 @@ Tuesday, 02 Jun 2026
 Expected flow:
 
 1. Assistant calls `preview_logwork_batch`.
-2. Assistant shows the summary and asks for approval.
+2. Assistant shows the summary, including the approval checklist with total hours, date range, and project breakdown, then asks for approval.
 3. Assistant calls `apply_logwork_batch` with the returned `batchId` only after you approve.
 
 `apply_logwork_batch` requires `confirm: true` and a cached `batchId` from the preview step. If the preview expired or changed, rerun `preview_logwork_batch` before applying.
