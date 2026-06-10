@@ -164,6 +164,8 @@ test('authenticateWithApi submits credentials, device, OTP, token exchange, and 
   };
 
   const token = await authenticateWithApi({
+    keycloakState: 'state-value',
+    keycloakNonce: 'nonce-value',
     fetchImpl,
     diagnosticsRecorder: {
       event(name, details) {
@@ -251,6 +253,8 @@ test('authenticateWithApi submits variant credential and OTP field names', async
   };
 
   const token = await authenticateWithApi({
+    keycloakState: 'state-value',
+    keycloakNonce: 'nonce-value',
     fetchImpl,
     credentialProvider: {
       async requestCredentials() {
@@ -308,6 +312,8 @@ test('authenticateWithApi submits mixed OTP and device form in one request', asy
   };
 
   const token = await authenticateWithApi({
+    keycloakState: 'state-value',
+    keycloakNonce: 'nonce-value',
     fetchImpl,
     diagnosticsRecorder: {
       event(name, details) {
@@ -345,6 +351,112 @@ test('authenticateWithApi submits mixed OTP and device form in one request', asy
   assert.equal(otpSubmit.details.selectedDeviceSubmitted, true);
 });
 
+test('authenticateWithApi rejects authorization state mismatch', async () => {
+  const responses = [
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate" method="post"><input name="username"><input name="password" type="password"></form>`),
+    redirectResponse('https://app.resourceoptimiser.com/vinova/check-login#code=auth-code&state=wrong-state')
+  ];
+
+  await assert.rejects(
+    authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
+      fetchImpl: async () => responses.shift(),
+      credentialProvider: {
+        async requestCredentials() {
+          return {
+            email: 'user@example.com',
+            password: 'secret-password'
+          };
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 'API_AUTH_FAILED');
+      assert.match(error.message, /state did not match/);
+      return true;
+    }
+  );
+});
+
+test('authenticateWithApi blocks off-domain Keycloak form actions before credentials', async () => {
+  let credentialsRequested = false;
+
+  await assert.rejects(
+    authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
+      fetchImpl: async () => htmlResponse(`
+        <form action="https://evil.example/login" method="post">
+          <input name="username">
+          <input name="password" type="password">
+        </form>
+      `),
+      credentialProvider: {
+        async requestCredentials() {
+          credentialsRequested = true;
+          throw new Error('credentials should not be requested');
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 'API_AUTH_FAILED');
+      assert.match(error.message, /Blocked Keycloak form submission/);
+      assert.equal(credentialsRequested, false);
+      return true;
+    }
+  );
+});
+
+test('authenticateWithApi blocks off-domain auth redirects', async () => {
+  await assert.rejects(
+    authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
+      fetchImpl: async () => redirectResponse('https://evil.example/callback#code=auth-code&state=state-value'),
+      credentialProvider: {
+        async requestCredentials() {
+          throw new Error('credentials should not be requested');
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 'API_AUTH_FAILED');
+      assert.match(error.message, /Blocked auth redirect/);
+      return true;
+    }
+  );
+});
+
+test('authenticateWithApi rejects Keycloak token nonce mismatch when nonce is present', async () => {
+  const responses = [
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate" method="post"><input name="username"><input name="password" type="password"></form>`),
+    redirectResponse('https://app.resourceoptimiser.com/vinova/check-login#code=auth-code&state=state-value'),
+    jsonResponse({ access_token: makeKeycloakJwt({ nonce: 'wrong-nonce', exp: futureExp() }) })
+  ];
+
+  await assert.rejects(
+    authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
+      fetchImpl: async () => responses.shift(),
+      credentialProvider: {
+        async requestCredentials() {
+          return {
+            email: 'user@example.com',
+            password: 'secret-password'
+          };
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 'API_AUTH_FAILED');
+      assert.match(error.message, /nonce did not match/);
+      return true;
+    }
+  );
+});
+
 test('authenticateWithApi records repeated OTP page without leaking OTP', async () => {
   const events = [];
   let otpPromptCount = 0;
@@ -357,6 +469,8 @@ test('authenticateWithApi records repeated OTP page without leaking OTP', async 
 
   await assert.rejects(
     authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
       fetchImpl: async () => responses.shift(),
       diagnosticsRecorder: {
         event(name, details) {
@@ -408,6 +522,8 @@ test('authenticateWithApi stops repeated Keycloak device form loops safely', asy
 
   await assert.rejects(
     authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
       maxApiAuthSteps: 3,
       fetchImpl: async () => htmlResponse(repeatedDeviceForm),
       credentialProvider: {
@@ -439,6 +555,8 @@ test('authenticateWithApi stops repeated Keycloak device form loops safely', asy
 test('authenticateWithApi reports safe diagnostics when Keycloak returns no supported form', async () => {
   await assert.rejects(
     authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
       fetchImpl: async () => htmlResponse(`
         <html>
           <head><title>Login unavailable</title></head>
@@ -469,6 +587,8 @@ test('authenticateWithApi reports safe diagnostics when Keycloak returns no supp
 test('authenticateWithApi reports safe unsupported form field diagnostics', async () => {
   await assert.rejects(
     authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
       fetchImpl: async () => htmlResponse(`
         <html>
           <head><title>Unsupported login</title></head>
