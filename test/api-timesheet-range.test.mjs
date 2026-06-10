@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getDayLogs,
+  getNormalizationDiagnostics,
   getTimesheetRange,
   normalizeLogtimeEntries,
   normalizeTimesheetRange
@@ -203,6 +204,87 @@ test('normalizeTimesheetRange expands real project timesheet shape and ignores o
   ]);
 });
 
+test('normalizeTimesheetRange reports dropped rows and malformed hour diagnostics', () => {
+  const records = normalizeTimesheetRange({
+    data: [
+      {
+        date: '2026-06-01',
+        project_member_id: 1111,
+        project_name: 'Malformed Hours',
+        booked_hours: 'not-a-number',
+        logged_hours: -2
+      },
+      {
+        date: '2026-06-01',
+        booked_hours: 2,
+        logged_hours: 1
+      },
+      {
+        project_member_id: 2222,
+        booked_hours: 1
+      },
+      {
+        date: '2026-06-01',
+        project_member_id: 3333,
+        project_name: 'Valid Project',
+        booked_hours: 2,
+        logged_hours: 1
+      }
+    ]
+  }, {
+    from: '2026-06-01',
+    to: '2026-06-02'
+  });
+
+  assert.equal(records.length, 2);
+  assert.equal(records[0].projectMemberId, 1111);
+  assert.equal(records[0].bookedHours, 0);
+  assert.equal(records[0].loggedHours, 0);
+  assert.equal(records[1].projectMemberId, 3333);
+  assert.equal(records[1].bookedHours, 2);
+  assert.equal(records[1].loggedHours, 1);
+
+  const diagnostics = getNormalizationDiagnostics(records);
+  assert.equal(diagnostics.status, 'warning');
+  assert.equal(diagnostics.rowsRead, 4);
+  assert.equal(diagnostics.rowsAccepted, 2);
+  assert.deepEqual(diagnostics.warnings.map((warning) => warning.reason), [
+    'invalid_hours',
+    'invalid_hours'
+  ]);
+  assert.deepEqual(diagnostics.droppedRows.map((row) => row.reason).sort(), [
+    'missing_date',
+    'missing_project_identity'
+  ]);
+});
+
+test('normalizeTimesheetRange reports unknown API envelope without throwing away context silently', () => {
+  const records = normalizeTimesheetRange({
+    data: {
+      unexpected: true
+    }
+  }, {
+    from: '2026-06-01',
+    to: '2026-06-02'
+  });
+
+  assert.deepEqual(records, []);
+  assert.deepEqual(getNormalizationDiagnostics(records), {
+    status: 'warning',
+    sourceShape: 'range_scan',
+    rowsRead: 0,
+    rowsAccepted: 0,
+    droppedRowCount: 0,
+    warningCount: 1,
+    warnings: [
+      {
+        reason: 'unknown_timesheet_shape'
+      }
+    ],
+    droppedRows: []
+  });
+});
+
 test('getDayLogs builds expected detail query params', async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl;
@@ -257,6 +339,48 @@ test('normalizeLogtimeEntries returns sanitized task entries', () => {
   ]);
 });
 
+test('normalizeLogtimeEntries reports dropped malformed detail rows', () => {
+  const entries = normalizeLogtimeEntries([
+    {
+      id: 1,
+      logdate: '2026-06-01T00:00:00.000Z',
+      project_id: 643,
+      logtimes: 1,
+      task_name: 'Valid detail'
+    },
+    {
+      id: 2,
+      logdate: '2026-06-01T00:00:00.000Z',
+      project_id: 643,
+      logtimes: 'bad-hours',
+      task_name: 'Bad hours'
+    },
+    {
+      id: 3,
+      logdate: '2026-06-01T00:00:00.000Z',
+      logtimes: 1,
+      task_name: 'Missing project'
+    },
+    {
+      id: 4,
+      project_id: 643,
+      logtimes: 1,
+      task_name: 'Missing date'
+    }
+  ]);
+
+  assert.deepEqual(entries.map((entry) => entry.id), [1]);
+  const diagnostics = getNormalizationDiagnostics(entries);
+  assert.equal(diagnostics.rowsRead, 4);
+  assert.equal(diagnostics.rowsAccepted, 1);
+  assert.deepEqual(diagnostics.warnings.map((warning) => warning.reason), ['invalid_hours']);
+  assert.deepEqual(diagnostics.droppedRows.map((row) => row.reason).sort(), [
+    'missing_date',
+    'missing_project_identity',
+    'non_positive_hours'
+  ]);
+});
+
 test('normalizeTimesheetRange avoids Project undefined fallback names', () => {
   const records = normalizeTimesheetRange([
     {
@@ -279,4 +403,7 @@ test('normalizeTimesheetRange avoids Project undefined fallback names', () => {
 
   assert.equal(records[0].projectName, 'Project 5234');
   assert.equal(records[0].entries[0].projectName, 'Project 5234');
+  assert.equal(getNormalizationDiagnostics(records).warnings.filter((warning) => (
+    warning.reason === 'fallback_project_name'
+  )).length, 2);
 });

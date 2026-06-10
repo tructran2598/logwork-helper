@@ -6,6 +6,9 @@ import {
   normalizeQueryRange,
   queryLogwork
 } from '../lib/query-workflow.mjs';
+import {
+  normalizeTimesheetRange
+} from '../lib/api.mjs';
 
 const records = [
   {
@@ -124,6 +127,47 @@ test('queryLogwork skips fallback when includeEntries is false', async () => {
 
   assert.equal(result.entries.length, 0);
   assert.equal(fallbackCalls, 0);
+});
+
+test('queryLogwork exposes normalization warnings without changing query fields', async () => {
+  const normalizedRecords = normalizeTimesheetRange({
+    data: [
+      {
+        date: '2026-06-05',
+        project_member_id: 5352,
+        project_id: 100,
+        project_name: 'Course Builder',
+        booked_hours: 'bad-hours',
+        logged_hours: 0
+      }
+    ]
+  }, {
+    from: '2026-06-05',
+    to: '2026-06-06'
+  });
+
+  const result = await queryLogwork({
+    date: '2026-06-05',
+    includeEntries: false,
+    cwd: '/private/tmp/no-config-here',
+    fetchRange: async () => normalizedRecords
+  });
+
+  assert.deepEqual(Object.keys(result).sort(), [
+    'days',
+    'entries',
+    'missingDetailEntries',
+    'normalization',
+    'projects',
+    'range',
+    'summary',
+    'totals',
+    'unmatchedProjectFilter'
+  ]);
+  assert.equal(result.totals.bookedHours, 0);
+  assert.equal(result.days[0].projects[0].bookedHours, 0);
+  assert.equal(result.normalization.status, 'warning');
+  assert.deepEqual(result.normalization.warnings.map((warning) => warning.reason), ['invalid_hours']);
 });
 
 test('collectEntries fetches detail logs for records with logged hours even when timesheet has entries', async () => {
