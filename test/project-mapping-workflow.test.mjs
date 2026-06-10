@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   loadLocalConfig,
-  configPath
+  configPath,
+  normalizeConfig
 } from '../lib/logwork-config.mjs';
 import {
   helperHome,
@@ -178,6 +179,31 @@ test('config paths default to helper home and support project scope', async () =
   assert.equal(configPath(cwd, 'project'), join(cwd, '.logwork-helper.json'));
 });
 
+test('normalizeConfig cleans mapping arrays and drops mappings without project identity', () => {
+  assert.deepEqual(normalizeConfig({
+    projectMappings: [
+      {
+        projectName: '  Course Builder  ',
+        projectMemberId: ' 5234 ',
+        tickets: [' scb ', 'SCB', '', 123, 'ops'],
+        keywords: [' question bank ', 'Question Bank', '', null, 'support']
+      },
+      {
+        tickets: ['DROP']
+      }
+    ]
+  }), {
+    projectMappings: [
+      {
+        projectName: 'Course Builder',
+        projectMemberId: '5234',
+        tickets: ['SCB', 'OPS'],
+        keywords: ['question bank', 'support']
+      }
+    ]
+  });
+});
+
 test('loadLocalConfig reads legacy home mapping and upsert migrates it into helper home', async () => {
   const fakeHome = await mkdtemp(join(tmpdir(), 'logwork-helper-legacy-home-'));
   process.env.HOME = fakeHome;
@@ -206,6 +232,55 @@ test('loadLocalConfig reads legacy home mapping and upsert migrates it into help
   assert.equal(result.configPath, join(helperHomePath, '.logwork-helper.json'));
   assert.deepEqual(result.mapping.tickets, ['SCB', 'NEW']);
   assert.deepEqual(result.mapping.keywords, ['legacy', 'current']);
+});
+
+test('loadLocalConfig merges duplicate mappings across legacy, user, and project sources', async () => {
+  const fakeHome = await mkdtemp(join(tmpdir(), 'logwork-helper-legacy-home-'));
+  process.env.HOME = fakeHome;
+  await useTempHelperHome({ preserveHome: true });
+  const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-project-'));
+  await fs.mkdir(cwd, { recursive: true });
+  await fs.writeFile(legacyUserConfigPath(), JSON.stringify({
+    projectMappings: [
+      {
+        projectName: 'Legacy Course Builder',
+        projectMemberId: 5234,
+        tickets: ['scb'],
+        keywords: ['legacy']
+      }
+    ]
+  }), 'utf8');
+  await fs.writeFile(userConfigPath(), JSON.stringify({
+    projectMappings: [
+      {
+        projectName: 'User Course Builder',
+        projectMemberId: 5234,
+        tickets: ['NEW', 'scb'],
+        keywords: ['legacy', 'user']
+      }
+    ]
+  }), 'utf8');
+  await fs.writeFile(join(cwd, '.logwork-helper.json'), JSON.stringify({
+    projectMappings: [
+      {
+        projectName: 'Project Course Builder',
+        projectMemberId: 5234,
+        tickets: ['PRJ'],
+        keywords: ['project']
+      }
+    ]
+  }), 'utf8');
+
+  const config = await loadLocalConfig(cwd);
+
+  assert.deepEqual(config.projectMappings, [
+    {
+      projectName: 'Project Course Builder',
+      projectMemberId: 5234,
+      tickets: ['SCB', 'NEW', 'PRJ'],
+      keywords: ['legacy', 'user', 'project']
+    }
+  ]);
 });
 
 async function useTempHelperHome({ preserveHome = false } = {}) {
