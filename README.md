@@ -266,9 +266,9 @@ Expected flow:
 
 1. Assistant calls `preview_logwork_batch`.
 2. Assistant shows the summary and asks for approval.
-3. Assistant calls `apply_logwork_batch` only after you approve.
+3. Assistant calls `apply_logwork_batch` with the returned `batchId` only after you approve.
 
-`apply_logwork_batch` requires `confirm: true`.
+`apply_logwork_batch` requires `confirm: true` and a cached `batchId` from the preview step. If the preview expired or changed, rerun `preview_logwork_batch` before applying.
 
 ### Setup Project Mapping
 
@@ -339,7 +339,7 @@ Security model:
 - Token is not stored in MCP config.
 - Token is not stored in `.logwork-helper.json`.
 - Auth does not open or read any browser profile.
-- MCP writes logwork only after an assistant calls `apply_logwork_batch` with explicit confirmation.
+- MCP writes logwork only after an assistant calls `apply_logwork_batch` with explicit confirmation and a cached preview `batchId`.
 - `query_logwork` and `list_logwork_projects` are read-only.
 
 ## Update

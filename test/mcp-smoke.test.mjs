@@ -84,15 +84,7 @@ test('MCP preview cache expires old previews and caps stored batches', () => {
 test('MCP preview cache clones previews and rejects mismatched approved batches', () => {
   const cache = new Map();
   const now = 1_000;
-  const preview = {
-    batchId: 'batch-safe',
-    entries: [
-      {
-        id: 'entry_1',
-        taskName: 'original task'
-      }
-    ]
-  };
+  const preview = createApprovedPreview();
 
   setCachedPreview(cache, preview, now);
   preview.entries[0].taskName = 'mutated before apply';
@@ -113,3 +105,102 @@ test('MCP preview cache clones previews and rejects mismatched approved batches'
     now
   }), /Approved batch mismatch/);
 });
+
+test('MCP apply requires cached preview provenance', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedPreview();
+
+  assert.throws(() => resolveApprovedBatch({
+    cache,
+    batch: preview,
+    now
+  }), /requires batchId/);
+
+  assert.throws(() => resolveApprovedBatch({
+    cache,
+    batchId: preview.batchId,
+    batch: preview,
+    now
+  }), /Missing cached preview/);
+
+  setCachedPreview(cache, preview, now);
+  assert.throws(() => resolveApprovedBatch({
+    cache,
+    batchId: preview.batchId,
+    now: now + 60 * 60 * 1000
+  }), /Missing cached preview/);
+});
+
+test('MCP apply rejects mutated approved batch content', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedPreview();
+  setCachedPreview(cache, preview, now);
+
+  for (const mutate of [
+    (batch) => { batch.entries[0].hours = 3; },
+    (batch) => { batch.entries[0].taskName = 'forged task'; },
+    (batch) => { batch.entries[0].status = 'resolved_unbooked'; },
+    (batch) => { batch.entries[0].matchedProject.projectMemberId = 9999; }
+  ]) {
+    const mutated = structuredClone(preview);
+    mutate(mutated);
+
+    assert.throws(() => resolveApprovedBatch({
+      cache,
+      batchId: preview.batchId,
+      batch: mutated,
+      now
+    }), /content changed/);
+  }
+});
+
+test('MCP apply accepts matching batch echo but uses cached preview', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedPreview();
+  setCachedPreview(cache, preview, now);
+
+  const matchingEcho = structuredClone(preview);
+  matchingEcho.summary = 'client display text changed';
+
+  const approved = resolveApprovedBatch({
+    cache,
+    batchId: preview.batchId,
+    batch: matchingEcho,
+    now
+  });
+
+  assert.equal(approved.summary, preview.summary);
+  matchingEcho.entries[0].taskName = 'mutated after approval';
+  assert.equal(getCachedPreview(cache, preview.batchId, now).entries[0].taskName, preview.entries[0].taskName);
+});
+
+function createApprovedPreview() {
+  return {
+    batchId: 'batch-safe',
+    status: 'ready',
+    errors: [],
+    entries: [
+      {
+        id: 'entry_1',
+        date: '2026-06-01',
+        hours: 2,
+        taskName: 'original task',
+        tickets: ['SCB-213'],
+        status: 'resolved',
+        reason: 'single_booked_project',
+        confidence: 0.95,
+        matchedProject: {
+          projectMemberId: 5352,
+          projectId: 1,
+          projectName: 'Course Builder'
+        },
+        booked: true,
+        requiresAllowUnbooked: false
+      }
+    ],
+    summary: 'Logwork preview:\n- 2026-06-01: +2h Course Builder - original task'
+  };
+}

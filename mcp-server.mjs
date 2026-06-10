@@ -43,8 +43,8 @@ server.registerTool('preview_logwork_batch', {
 server.registerTool('apply_logwork_batch', {
   description: 'Submit an approved logwork preview. Requires confirm: true and blocks unresolved entries.',
   inputSchema: {
-    batchId: z.string().optional().describe('batchId returned by preview_logwork_batch.'),
-    batch: z.any().optional().describe('Full structured preview returned by preview_logwork_batch.'),
+    batchId: z.string().optional().describe('batchId returned by preview_logwork_batch. Required for apply.'),
+    batch: z.any().optional().describe('Backward-compatible structured preview echo. When provided, it must match the cached preview for batchId.'),
     confirm: z.boolean().describe('Must be true after explicit user approval.'),
     allowUnbooked: z.boolean().optional().describe('Allow submitting entries resolved to a valid project membership without a booking for that date.'),
     projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Final map from preview entry id to projectMemberId.')
@@ -143,14 +143,21 @@ if (isMainModule(import.meta.url)) {
 
 export function setCachedPreview(cache, preview, now = Date.now()) {
   prunePreviewCache(cache, now);
-  cache.set(preview.batchId, {
-    preview: clonePreview(preview),
+  const cachedPreview = clonePreview(preview);
+  cache.set(cachedPreview.batchId, {
+    preview: cachedPreview,
+    fingerprint: createPreviewFingerprint(cachedPreview),
     expiresAt: now + PREVIEW_TTL_MS
   });
   prunePreviewCache(cache, now);
 }
 
 export function getCachedPreview(cache, batchId, now = Date.now()) {
+  const cached = getCachedPreviewRecord(cache, batchId, now);
+  return cached ? clonePreview(cached.preview) : null;
+}
+
+function getCachedPreviewRecord(cache, batchId, now = Date.now()) {
   const cached = cache.get(batchId);
   if (!cached) {
     return null;
@@ -161,7 +168,7 @@ export function getCachedPreview(cache, batchId, now = Date.now()) {
     return null;
   }
 
-  return clonePreview(cached.preview);
+  return cached;
 }
 
 export function prunePreviewCache(cache, now = Date.now()) {
@@ -186,16 +193,48 @@ export function resolveApprovedBatch({
   batch,
   now = Date.now()
 }) {
-  if (batchId && batch?.batchId && batch.batchId !== batchId) {
+  if (!batchId) {
+    throw new Error('apply_logwork_batch requires batchId from preview_logwork_batch. Re-run preview_logwork_batch and apply using the returned batchId.');
+  }
+
+  if (batch?.batchId && batch.batchId !== batchId) {
     throw new Error(`Approved batch mismatch: batchId ${batchId} does not match batch.batchId ${batch.batchId}. Re-run preview_logwork_batch before applying.`);
   }
 
-  const approvedBatch = batch || getCachedPreview(cache, batchId, now);
-  if (!approvedBatch) {
-    throw new Error('Missing approved batch. Pass batchId from preview_logwork_batch or the full structured batch.');
+  const cached = getCachedPreviewRecord(cache, batchId, now);
+  if (!cached) {
+    throw new Error('Missing cached preview for batchId. Re-run preview_logwork_batch and apply using the returned batchId.');
   }
 
-  return approvedBatch;
+  if (batch && createPreviewFingerprint(batch) !== cached.fingerprint) {
+    throw new Error('Approved batch content changed after preview. Re-run preview_logwork_batch and apply using the returned batchId.');
+  }
+
+  return clonePreview(cached.preview);
+}
+
+export function createPreviewFingerprint(preview = {}) {
+  return JSON.stringify({
+    batchId: textOrNull(preview.batchId),
+    status: textOrNull(preview.status),
+    errors: arrayOrEmpty(preview.errors).map((error) => ({
+      line: valueOrNull(error?.line),
+      message: textOrNull(error?.message)
+    })),
+    entries: arrayOrEmpty(preview.entries).map((entry) => ({
+      id: textOrNull(entry?.id),
+      date: textOrNull(entry?.date),
+      hours: numberOrNull(entry?.hours),
+      taskName: textOrNull(entry?.taskName),
+      tickets: arrayOrEmpty(entry?.tickets).map((ticket) => String(ticket)),
+      status: textOrNull(entry?.status),
+      reason: textOrNull(entry?.reason),
+      confidence: numberOrNull(entry?.confidence),
+      matchedProject: projectFingerprint(entry?.matchedProject),
+      booked: booleanOrNull(entry?.booked),
+      requiresAllowUnbooked: booleanOrNull(entry?.requiresAllowUnbooked)
+    }))
+  });
 }
 
 function clonePreview(preview) {
@@ -203,6 +242,45 @@ function clonePreview(preview) {
     return structuredClone(preview);
   }
   return JSON.parse(JSON.stringify(preview));
+}
+
+function projectFingerprint(project) {
+  if (!project || typeof project !== 'object') {
+    return null;
+  }
+
+  return {
+    projectMemberId: idOrNull(project.projectMemberId),
+    projectId: idOrNull(project.projectId),
+    projectName: textOrNull(project.projectName)
+  };
+}
+
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function textOrNull(value) {
+  return value === undefined || value === null ? null : String(value);
+}
+
+function idOrNull(value) {
+  return value === undefined || value === null || String(value).trim() === ''
+    ? null
+    : String(value);
+}
+
+function valueOrNull(value) {
+  return value === undefined ? null : value;
+}
+
+function numberOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function booleanOrNull(value) {
+  return value === undefined || value === null ? null : Boolean(value);
 }
 
 function withAuthRequiredHandling(handler) {
