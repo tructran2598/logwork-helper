@@ -108,6 +108,36 @@ test('parseHtmlForms finds Keycloak credential, device, and OTP forms', () => {
     </form>
   `);
   assert.equal(visibleCodeWithOtpHint.kind, 'otp');
+
+  const variantCredentials = selectNextKeycloakForm(`
+    <form action="/login" method="post">
+      <input name="login" autocomplete="username">
+      <input name="passwd" type="password">
+    </form>
+  `);
+  assert.equal(variantCredentials.kind, 'credentials');
+
+  const mfaCode = selectNextKeycloakForm(`
+    <form action="/mfa" method="post">
+      <input type="text" name="mfa_code">
+    </form>
+  `);
+  assert.equal(mfaCode.kind, 'otp');
+
+  const verificationCode = selectNextKeycloakForm(`
+    <form action="/verify" method="post">
+      <input type="text" name="verification_code">
+    </form>
+  `);
+  assert.equal(verificationCode.kind, 'otp');
+
+  const [wrappedDeviceLabel] = parseHtmlForms(`
+    <form action="/device" method="post">
+      <label><input type="radio" name="credentialId" value="phone"> Mobile phone</label>
+    </form>
+  `, 'https://keycloak.vinova.sg/auth/realms/resource/login-actions/authenticate?execution=step');
+  assert.equal(wrappedDeviceLabel.kind, 'device');
+  assert.equal(wrappedDeviceLabel.devices[0].label, 'Mobile phone');
 });
 
 test('authenticateWithApi submits credentials, device, OTP, token exchange, and signinKeyCloak', async () => {
@@ -190,6 +220,61 @@ test('authenticateWithApi submits credentials, device, OTP, token exchange, and 
   assert.equal(events[0].details.path, '/auth/realms/resource/protocol/openid-connect/auth');
   assert.deepEqual(events.at(-2).details.jsonKeys, ['access_token']);
   assert.deepEqual(events.at(-1).details.jsonKeys, ['accessToken']);
+});
+
+test('authenticateWithApi submits variant credential and OTP field names', async () => {
+  const finalToken = makeJwt({ id: 115, exp: futureExp() });
+  const requests = [];
+  const responses = [
+    htmlResponse(`
+      <form action="/auth/realms/resource/login-actions/authenticate?session_code=s1&execution=e1&tab_id=t1" method="post">
+        <input name="login" autocomplete="username">
+        <input name="passwd" type="password">
+      </form>
+    `),
+    htmlResponse(`
+      <form action="https://keycloak.vinova.sg/auth/realms/resource/login-actions/authenticate?session_code=s2&execution=e2&tab_id=t2" method="post">
+        <input type="text" name="mfa_code" autocomplete="one-time-code">
+      </form>
+    `),
+    redirectResponse('https://app.resourceoptimiser.com/vinova/check-login#code=auth-code&state=state-value'),
+    jsonResponse({ access_token: makeJwt({ sub: 'keycloak-user', exp: futureExp() }) }),
+    jsonResponse({ accessToken: finalToken })
+  ];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({
+      url: String(url),
+      method: options.method || 'GET',
+      body: String(options.body || '')
+    });
+    return responses.shift();
+  };
+
+  const token = await authenticateWithApi({
+    fetchImpl,
+    credentialProvider: {
+      async requestCredentials() {
+        return {
+          email: 'user@example.com',
+          password: 'secret-password'
+        };
+      },
+      async requestDeviceSelection() {
+        throw new Error('device should not be requested');
+      },
+      async requestOtp() {
+        return '654321';
+      }
+    }
+  });
+
+  assert.equal(token, finalToken);
+  assert.equal(requests[1].body.includes('login=user%40example.com'), true);
+  assert.equal(requests[1].body.includes('passwd=secret-password'), true);
+  assert.equal(requests[1].body.includes('username='), false);
+  assert.equal(requests[1].body.includes('password='), false);
+  assert.equal(requests[2].body.includes('mfa_code=654321'), true);
+  assert.equal(requests[2].body.includes('otp='), false);
 });
 
 test('authenticateWithApi submits mixed OTP and device form in one request', async () => {
@@ -376,6 +461,38 @@ test('authenticateWithApi reports safe diagnostics when Keycloak returns no supp
       assert.equal(error.message.includes('raw-token'), false);
       assert.equal(error.message.includes('password='), false);
       assert.equal(error.message.includes('Cookie'), false);
+      return true;
+    }
+  );
+});
+
+test('authenticateWithApi reports safe unsupported form field diagnostics', async () => {
+  await assert.rejects(
+    authenticateWithApi({
+      fetchImpl: async () => htmlResponse(`
+        <html>
+          <head><title>Unsupported login</title></head>
+          <body>
+            <form action="/unsupported" method="post">
+              <input name="mystery" value="hidden-secret">
+              <input name="country_code" id="country-code" value="84">
+            </form>
+          </body>
+        </html>
+      `),
+      credentialProvider: {
+        async requestCredentials() {
+          throw new Error('credentials should not be requested');
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 'API_AUTH_FAILED');
+      assert.match(error.message, /Forms: 1 \(unknown\)/);
+      assert.match(error.message, /Fields: form1\{kind=unknown fields=\[mystery:text,country_code:text\]\}/);
+      assert.equal(error.message.includes('hidden-secret'), false);
+      assert.equal(error.message.includes('<input'), false);
+      assert.equal(error.message.includes('password='), false);
       return true;
     }
   );
