@@ -51,10 +51,11 @@ server.registerTool('apply_logwork_batch', {
   }
 }, withAuthRequiredHandling(async ({ batchId, batch, confirm, allowUnbooked = false, projectOverrides = {} }) => {
   prunePreviewCache(previews);
-  const approvedBatch = batch || getCachedPreview(previews, batchId);
-  if (!approvedBatch) {
-    throw new Error('Missing approved batch. Pass batchId from preview_logwork_batch or the full structured batch.');
-  }
+  const approvedBatch = resolveApprovedBatch({
+    cache: previews,
+    batchId,
+    batch
+  });
 
   const result = await applyLogworkBatch({
     batch: approvedBatch,
@@ -143,7 +144,7 @@ if (isMainModule(import.meta.url)) {
 export function setCachedPreview(cache, preview, now = Date.now()) {
   prunePreviewCache(cache, now);
   cache.set(preview.batchId, {
-    preview,
+    preview: clonePreview(preview),
     expiresAt: now + PREVIEW_TTL_MS
   });
   prunePreviewCache(cache, now);
@@ -160,7 +161,7 @@ export function getCachedPreview(cache, batchId, now = Date.now()) {
     return null;
   }
 
-  return cached.preview;
+  return clonePreview(cached.preview);
 }
 
 export function prunePreviewCache(cache, now = Date.now()) {
@@ -177,6 +178,31 @@ export function prunePreviewCache(cache, now = Date.now()) {
     }
     cache.delete(oldestBatchId);
   }
+}
+
+export function resolveApprovedBatch({
+  cache,
+  batchId,
+  batch,
+  now = Date.now()
+}) {
+  if (batchId && batch?.batchId && batch.batchId !== batchId) {
+    throw new Error(`Approved batch mismatch: batchId ${batchId} does not match batch.batchId ${batch.batchId}. Re-run preview_logwork_batch before applying.`);
+  }
+
+  const approvedBatch = batch || getCachedPreview(cache, batchId, now);
+  if (!approvedBatch) {
+    throw new Error('Missing approved batch. Pass batchId from preview_logwork_batch or the full structured batch.');
+  }
+
+  return approvedBatch;
+}
+
+function clonePreview(preview) {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(preview);
+  }
+  return JSON.parse(JSON.stringify(preview));
 }
 
 function withAuthRequiredHandling(handler) {

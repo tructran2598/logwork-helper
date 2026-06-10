@@ -7,6 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
   getCachedPreview,
+  resolveApprovedBatch,
   setCachedPreview
 } from '../mcp-server.mjs';
 
@@ -78,4 +79,37 @@ test('MCP preview cache expires old previews and caps stored batches', () => {
   assert.equal(cache.size, 100);
   assert.equal(getCachedPreview(cache, 'batch-0', now), null);
   assert.deepEqual(getCachedPreview(cache, 'batch-100', now), { batchId: 'batch-100' });
+});
+
+test('MCP preview cache clones previews and rejects mismatched approved batches', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = {
+    batchId: 'batch-safe',
+    entries: [
+      {
+        id: 'entry_1',
+        taskName: 'original task'
+      }
+    ]
+  };
+
+  setCachedPreview(cache, preview, now);
+  preview.entries[0].taskName = 'mutated before apply';
+
+  const cached = getCachedPreview(cache, 'batch-safe', now);
+  assert.equal(cached.entries[0].taskName, 'original task');
+  cached.entries[0].taskName = 'mutated cached copy';
+  assert.equal(getCachedPreview(cache, 'batch-safe', now).entries[0].taskName, 'original task');
+  assert.equal(resolveApprovedBatch({ cache, batchId: 'batch-safe', now }).entries[0].taskName, 'original task');
+
+  assert.throws(() => resolveApprovedBatch({
+    cache,
+    batchId: 'batch-safe',
+    batch: {
+      batchId: 'batch-other',
+      entries: []
+    },
+    now
+  }), /Approved batch mismatch/);
 });
