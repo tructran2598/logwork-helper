@@ -471,7 +471,7 @@ This runs tests, production dependency audit, package dry run, and whitespace ch
 - **`query_logwork` or `allowUnbooked` missing**: reload the MCP tool cache or restart the IDE.
 - **Not authenticated**: run `logwork-helper auth login`, or ask the assistant to call `start_auth_login`; enter secrets only in Terminal.
 - **Auth error after 2FA**: retry `logwork-helper auth login`. If it still fails, run `logwork-helper diagnostics` and send only the generated sanitized report.
-- **Support needs logs**: run `logwork-helper diagnostics`; the report is saved under `~/.logwork-helper/diagnostics` and redacts tokens, cookies, passwords, OTPs, auth codes, and raw HTML.
+- **Support needs logs**: run `logwork-helper doctor` or `logwork-helper diagnostics`; the report is saved under `~/.logwork-helper/diagnostics` and redacts tokens, cookies, passwords, OTPs, auth codes, and raw HTML.
 - **No project matched**: ask the assistant to call `list_logwork_projects`, choose the correct project, then call `upsert_project_mapping`.
 - **Do not paste Bearer tokens, cookies, passwords, OTPs, or raw curl auth logs**: auth is handled locally and MCP config should only contain `command` and `args`.
 

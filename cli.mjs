@@ -53,6 +53,15 @@ Authentication uses the Resource Optimiser / Keycloak API flow and does not open
 Writes a sanitized support report under ~/.logwork-helper/diagnostics.
 Send only the generated file to developers; do not send raw curl logs, cookies, passwords, OTPs, or tokens.`
   }],
+  ['doctor', {
+    script: 'diagnostics-cli.mjs',
+    description: 'Alias for diagnostics; write a sanitized setup health report.',
+    help: `Usage:
+  logwork-helper doctor
+
+Runs the same checks as diagnostics and writes a sanitized support report under ~/.logwork-helper/diagnostics.
+Send only the generated file to developers; do not send raw curl logs, cookies, passwords, OTPs, or tokens.`
+  }],
   ['manual', {
     script: 'manual-log.mjs',
     description: 'Open the manual terminal logwork REPL.',
@@ -156,6 +165,7 @@ function printHelp() {
   logwork-helper setup-user
   logwork-helper auth login
   logwork-helper diagnostics
+  logwork-helper doctor
   logwork-helper mcp
   logwork
   logwork-helper manual

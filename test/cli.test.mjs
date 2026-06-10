@@ -65,6 +65,7 @@ test('CLI dispatcher prints top-level help', () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /logwork-helper setup-user/);
   assert.match(result.stdout, /logwork-helper auth login/);
+  assert.match(result.stdout, /logwork-helper doctor/);
   assert.match(result.stdout, /logwork-helper mcp/);
   assert.match(result.stdout, /\n  logwork\n/);
   assert.match(result.stdout, /Primary setup:/);
@@ -106,9 +107,38 @@ test('CLI dispatcher prints diagnostics help', () => {
   assert.match(result.stdout, /sanitized support report/);
 });
 
+test('CLI dispatcher prints doctor help', () => {
+  const result = spawnSync(process.execPath, ['cli.mjs', 'doctor', '--help'], {
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /logwork-helper doctor/);
+  assert.match(result.stdout, /same checks as diagnostics/);
+  assert.match(result.stdout, /passwords, OTPs, or tokens/);
+});
+
 test('CLI dispatcher runs diagnostics command and writes report', () => {
   const dir = mkdtempSync(join(tmpdir(), 'logwork-diagnostics-cli-'));
   const result = spawnSync(process.execPath, ['cli.mjs', 'diagnostics'], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      LOGWORK_HELPER_HOME: dir
+    }
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /Diagnostics report written to/);
+  const reportPath = result.stdout.match(/Diagnostics report written to (.+)/)?.[1]?.trim();
+  assert.ok(reportPath);
+  assert.equal(existsSync(reportPath), true);
+  assert.doesNotMatch(readFileSync(reportPath, 'utf8'), /eyJ/);
+});
+
+test('CLI dispatcher runs doctor command and writes sanitized report', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'logwork-doctor-cli-'));
+  const result = spawnSync(process.execPath, ['cli.mjs', 'doctor'], {
     encoding: 'utf8',
     env: {
       ...process.env,
