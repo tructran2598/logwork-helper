@@ -15,6 +15,7 @@ import {
   listLogworkProjects,
   upsertProjectMapping
 } from './lib/project-mapping-workflow.mjs';
+import { readPackageVersion } from './lib/package-info.mjs';
 import { queryLogwork } from './lib/query-workflow.mjs';
 
 const PREVIEW_TTL_MS = 60 * 60 * 1000;
@@ -23,7 +24,7 @@ const previews = new Map();
 
 const server = new McpServer({
   name: 'logwork-helper',
-  version: '0.1.0'
+  version: readPackageVersion()
 });
 
 server.registerTool('preview_logwork_batch', {

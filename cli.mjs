@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readPackageVersion } from './lib/package-info.mjs';
 
 const helperDir = dirname(fileURLToPath(import.meta.url));
 
@@ -195,11 +195,6 @@ function formatCommands() {
   return [...COMMANDS.entries()]
     .map(([name, command]) => `  ${name.padEnd(13)} ${command.description}`)
     .join('\n');
-}
-
-function readPackageVersion() {
-  const packageJson = JSON.parse(readFileSync(join(helperDir, 'package.json'), 'utf8'));
-  return packageJson.version;
 }
 
 main().catch((error) => {

@@ -38,7 +38,8 @@
     "hooks/",
     "lib/",
     "examples/mcp/",
-    "README.md"
+    "README.md",
+    "RELEASE.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -58,6 +59,9 @@
     "log:dry-run": "LOGWORK_DRY_RUN=1 node manual-log.mjs",
     "start": "node logwork-helper.mjs",
     "dry-run": "LOGWORK_DRY_RUN=1 node logwork-helper.mjs",
+    "audit:prod": "npm audit --omit=dev --audit-level=moderate",
+    "pack:check": "npm pack --dry-run",
+    "release:check": "npm test && npm run audit:prod && npm run pack:check && git diff --check",
     "test": "node --test"
   },
   "dependencies": {

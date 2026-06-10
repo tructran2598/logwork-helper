@@ -436,6 +436,16 @@ Press `Esc` from the main prompt to exit the manual CLI.
 
 The manual REPL uses the same safety model as MCP: preview first, explicit confirmation before submit, extra confirmation for unbooked entries, and API-only Resource Optimiser auth in Terminal. `/projects` shows this-week booked/logged charts per project so you can quickly see booked capacity, logged hours, and overbooked work.
 
+## Release Checks
+
+Before publishing or tagging a release, run:
+
+```bash
+npm run release:check
+```
+
+This runs tests, production dependency audit, package dry run, and whitespace checks. See [RELEASE.md](RELEASE.md) for the full checklist and manual verification steps.
+
 ## Troubleshooting
 
 - **IDE does not show tools**: restart/reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs`.
