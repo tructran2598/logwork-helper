@@ -54,6 +54,15 @@ import {
   TaskEditPicker,
   TaskRemovePicker
 } from '../lib/manual-ink-app.mjs';
+import {
+  StatusBar as DirectStatusBar,
+  commandItems,
+  loadingMessageForCommand,
+  sameProjectIdentity
+} from '../lib/manual-ink-ui.mjs';
+import {
+  AuthPrompt as DirectAuthPrompt
+} from '../lib/manual-ink-auth.mjs';
 
 const h = React.createElement;
 
@@ -197,6 +206,19 @@ test('Ink manual components render shell, current panel, pickers, menu, status, 
     onStartNew() {},
     onCancel() {}
   })), /Start new logwork session/);
+});
+
+test('Ink manual app re-exports maintain UI and auth module compatibility', () => {
+  assert.equal(StatusBar, DirectStatusBar);
+  assert.equal(AuthPrompt, DirectAuthPrompt);
+  assert.equal(loadingMessageForCommand({ type: 'query' }), 'Fetching Resource Optimiser timesheet...');
+  assert.equal(sameProjectIdentity({ projectMemberId: 5234 }, { projectMemberId: '5234' }), true);
+  assert.ok(commandItems().some((item) => item.value === '/query'));
+  assert.match(renderToString(h(DirectStatusBar, {
+    preview: null,
+    dryRun: false,
+    wizard: null
+  })), /mode: command · preview: none/);
 });
 
 test('Ink credential provider resolves auth steps without clack prompts', async () => {
