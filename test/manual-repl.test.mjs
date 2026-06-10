@@ -537,6 +537,43 @@ test('manual draft persistence saves, updates, lists newest first, deletes, and 
   assert.deepEqual(drafts.map((draft) => draft.id), [first.id]);
 });
 
+test('manual draft loading can be scoped to the current workspace', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'logwork-helper-drafts-'));
+  const path = join(dir, 'manual-drafts.json');
+  const current = await saveManualDraft({
+    cwd: '/tmp/current-repo',
+    date: '2026-06-01',
+    project: {
+      projectMemberId: 5234,
+      projectName: '2621A-SIT-HTML BUILDER-PRJ'
+    },
+    tasks: [
+      {
+        hours: 2,
+        taskName: 'current repo task'
+      }
+    ]
+  }, { path, cwd: '/tmp/current-repo' });
+  const other = await saveManualDraft({
+    cwd: '/tmp/other-repo',
+    date: '2026-06-02',
+    project: {
+      projectMemberId: 7777,
+      projectName: '2513A-JURONG-VAL-PRJ'
+    },
+    tasks: [
+      {
+        hours: 1,
+        taskName: 'other repo task'
+      }
+    ]
+  }, { path, cwd: '/tmp/other-repo' });
+
+  assert.deepEqual((await loadManualDrafts({ path, cwd: '/tmp/current-repo' })).map((draft) => draft.id), [current.id]);
+  assert.deepEqual((await loadManualDrafts({ path, cwd: '/tmp/other-repo' })).map((draft) => draft.id), [other.id]);
+  assert.deepEqual(new Set((await loadManualDrafts({ path })).map((draft) => draft.id)), new Set([current.id, other.id]));
+});
+
 test('manual projects prints weekly chart and calls project query', async () => {
   const printed = [];
   const session = createManualSession();
