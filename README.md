@@ -38,6 +38,23 @@ Check my logwork for this week.
 - Node.js 20+
 - npm, or yarn if you prefer `yarn dlx`
 
+## Environment Configuration
+
+Defaults target the current Resource Optimiser / Vinova profile. For non-default deployments, configure the runtime with environment variables instead of editing source:
+
+```bash
+LOGWORK_HELPER_PROFILE=vinova
+LOGWORK_API_BASE=https://api.resourceoptimiser.com/api/v1
+LOGWORK_LOGIN_URL=https://app.resourceoptimiser.com/vinova
+LOGWORK_KEYCLOAK_AUTH_URL=https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/auth
+LOGWORK_KEYCLOAK_TOKEN_URL=https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/token
+LOGWORK_KEYCLOAK_REDIRECT_URI=https://app.resourceoptimiser.com/vinova/check-login
+```
+
+Supported overrides: `LOGWORK_HELPER_PROFILE`, `LOGWORK_API_BASE`, `LOGWORK_LOGIN_URL`, `LOGWORK_TOKEN_KEY`, `LOGWORK_ALLOWED_SAFARI_HOSTS`, `LOGWORK_KEYCLOAK_AUTH_URL`, `LOGWORK_KEYCLOAK_TOKEN_URL`, `LOGWORK_KEYCLOAK_CLIENT_ID`, `LOGWORK_KEYCLOAK_REDIRECT_URI`, `LOGWORK_KEYCLOAK_SCOPE`, `LOGWORK_KEYCLOAK_RESPONSE_MODE`, `LOGWORK_KEYCLOAK_RESPONSE_TYPE`, `LOGWORK_HTTP_TIMEOUT_MS`, `LOGWORK_HTTP_READ_RETRIES`, `LOGWORK_HTTP_RETRY_DELAY_MS`, and `LOGWORK_DAY_LOG_CONCURRENCY`.
+
+URL and numeric overrides are validated on startup. Invalid values fail fast so the helper does not log work against an unintended endpoint.
+
 ## Install
 
 Recommended one-time install:

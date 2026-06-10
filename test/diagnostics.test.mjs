@@ -81,6 +81,9 @@ test('generateDiagnosticsReport writes sanitized support report', async () => {
     assert.match(report, /packageVersion:/);
     assert.match(report, /query_logwork/);
     assert.match(report, /Config Snapshot/);
+    assert.match(report, /profile: vinova/);
+    assert.match(report, /apiHost: api\.resourceoptimiser\.com/);
+    assert.match(report, /keycloakHost: keycloak\.vinova\.sg/);
     assert.match(report, /mappingCount: 2/);
     assert.match(report, /"tickets":\["SCB"\]/);
     assert.match(report, /"tickets":\["OPS"\]/);
