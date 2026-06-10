@@ -27,6 +27,9 @@ export const CONFIG = {
   loginPollMs: 2000,
   loginTimeoutMs: 5 * 60 * 1000,
   maxApiAuthSteps: 12,
+  httpTimeoutMs: 30 * 1000,
+  httpReadRetries: 2,
+  httpRetryDelayMs: 250,
 
   defaultHours: 1,
   standardDayHours: 8,

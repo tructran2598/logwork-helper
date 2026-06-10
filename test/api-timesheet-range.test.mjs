@@ -1,12 +1,72 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  apiFetch,
   getDayLogs,
   getNormalizationDiagnostics,
   getTimesheetRange,
   normalizeLogtimeEntries,
   normalizeTimesheetRange
 } from '../lib/api.mjs';
+
+test('apiFetch retries idempotent read failures and returns successful response', async () => {
+  let calls = 0;
+  const data = await apiFetch('token', '/retry-read', {
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response('temporary outage', { status: 503, statusText: 'Service Unavailable' });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+  });
+
+  assert.equal(calls, 2);
+  assert.deepEqual(data, { ok: true });
+});
+
+test('apiFetch does not retry non-idempotent writes', async () => {
+  let calls = 0;
+
+  await assert.rejects(
+    apiFetch('token', '/write', {
+      method: 'PATCH',
+      body: JSON.stringify({ ok: true }),
+      retries: 5,
+      retryDelayMs: 0,
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response('temporary outage', { status: 503, statusText: 'Service Unavailable' });
+      }
+    }),
+    /503/
+  );
+
+  assert.equal(calls, 1);
+});
+
+test('apiFetch redacts sensitive response bodies in errors', async () => {
+  const sensitiveToken = makeJwt({ id: 115 });
+
+  await assert.rejects(
+    apiFetch('token', '/bad', {
+      fetchImpl: async () => new Response(JSON.stringify({
+        accessToken: sensitiveToken,
+        password: 'secret-password',
+        detail: 'failed'
+      }), { status: 500, statusText: 'Internal Server Error' })
+    }),
+    (error) => {
+      assert.match(error.message, /Body:/);
+      assert.equal(error.message.includes(sensitiveToken), false);
+      assert.equal(error.message.includes('secret-password'), false);
+      assert.equal(error.body.includes(sensitiveToken), false);
+      assert.equal(error.body.includes('secret-password'), false);
+      return true;
+    }
+  );
+});
 
 test('getTimesheetRange builds expected query params', async () => {
   const originalFetch = globalThis.fetch;
@@ -407,3 +467,11 @@ test('normalizeTimesheetRange avoids Project undefined fallback names', () => {
     warning.reason === 'fallback_project_name'
   )).length, 2);
 });
+
+function makeJwt(payload) {
+  return [
+    Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url'),
+    Buffer.from(JSON.stringify(payload)).toString('base64url'),
+    'signature'
+  ].join('.');
+}
