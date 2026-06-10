@@ -20,8 +20,19 @@ test('buildLogworkBatchPreview returns ready batch with totals', () => {
 
   assert.equal(preview.status, 'ready');
   assert.equal(preview.entries.length, 2);
+  assert.deepEqual(preview.entries[0].resolution, {
+    status: 'resolved',
+    reason: 'single_booked_project',
+    confidence: 0.95,
+    booked: true,
+    autoResolved: true,
+    requiresUserChoice: false,
+    requiresAllowUnbooked: false,
+    candidates: []
+  });
   assert.deepEqual(preview.totalsByDate, { '2026-06-01': 3 });
   assert.deepEqual(preview.totalsByProject, { 'Course Builder': 3 });
+  assert.match(preview.summary, /via single_booked_project, confidence 0.95/);
 });
 
 test('buildLogworkBatchPreview marks mapped membership without booking as ready_with_unbooked', () => {
@@ -44,8 +55,50 @@ test('buildLogworkBatchPreview marks mapped membership without booking as ready_
   assert.equal(preview.entries[0].status, 'resolved_unbooked');
   assert.equal(preview.entries[0].booked, false);
   assert.equal(preview.entries[0].requiresAllowUnbooked, true);
+  assert.equal(preview.entries[0].resolution.requiresAllowUnbooked, true);
+  assert.equal(preview.entries[0].resolution.autoResolved, true);
   assert.equal(preview.entries[0].matchedProject.projectMemberId, 5234);
   assert.match(preview.summary, /UNBOOKED: \+2h/);
+});
+
+test('buildLogworkBatchPreview keeps ticket mapping conflicts unresolved', async () => {
+  const conflictParsed = parseWeeklyLogText(`Monday, 01 Jun 2026
++2 Maintenance mode management and status UI (SCB-213)`);
+  const preview = buildLogworkBatchPreview({
+    parsed: conflictParsed,
+    projectsByDate: new Map([[
+      '2026-06-01',
+      [{ projectMemberId: 1, projectId: 10, projectName: 'Internal' }]
+    ]]),
+    membershipProjects: [
+      { projectMemberId: 5234, projectId: 643, projectName: '2621A-SIT-HTML BUILDER-PRJ' }
+    ],
+    config: {
+      projectMappings: [
+        { projectMemberId: 5234, projectName: '2621A-SIT-HTML BUILDER-PRJ', tickets: ['SCB'] }
+      ]
+    }
+  });
+
+  assert.equal(preview.status, 'unresolved');
+  assert.equal(preview.entries[0].matchedProject, null);
+  assert.equal(preview.entries[0].reason, 'single_booked_project_conflicts_with_mapping');
+  assert.equal(preview.entries[0].resolution.requiresUserChoice, true);
+  assert.equal(preview.entries[0].resolution.autoResolved, false);
+  assert.deepEqual(preview.entries[0].candidates.map((candidate) => candidate.source), [
+    'config_ticket',
+    'single_booked_project'
+  ]);
+  assert.match(preview.summary, /needs user choice single_booked_project_conflicts_with_mapping, confidence 0.99/);
+
+  await assert.rejects(
+    () => applyLogworkBatch({
+      batch: preview,
+      confirm: true,
+      submitEntry: async () => ({ dryRun: true })
+    }),
+    /unresolved/
+  );
 });
 
 test('buildLogworkBatchPreview suggests mapping setup for unresolved ticket entries', () => {
