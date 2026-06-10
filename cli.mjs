@@ -10,13 +10,21 @@ const helperDir = dirname(fileURLToPath(import.meta.url));
 const COMMANDS = new Map([
   ['setup-user', {
     script: 'install-user.mjs',
-    description: 'Install Logwork Helper into ~/.logwork-helper and print MCP configs.',
+    description: 'Install Logwork Helper and print the onboarding checklist plus MCP configs.',
     help: `Usage:
   logwork-helper setup-user [--login|--no-login]
 
+Installs the runtime into ~/.logwork-helper, links terminal commands, prints MCP configs, and shows the next verification steps.
+
 Options:
   --login     Run Resource Optimiser auth login after installing
-  --no-login  Do not prompt for auth login after installing`
+  --no-login  Do not prompt for auth login after installing
+
+After setup:
+  1. Authenticate if setup did not complete auth for you.
+  2. Paste one printed MCP config into your IDE.
+  3. Restart or reload the IDE MCP tools.
+  4. Ask: Check my logwork for this week.`
   }],
   ['install-user', {
     script: 'install-user.mjs',
@@ -154,6 +162,12 @@ function printHelp() {
   logwork-helper manual quick --message "Task name"
   logwork-helper install-hook /path/to/repo
   logwork-helper hook --repo <repo> --msg-file <file> --lock <file> --result <file> --nonce <id> --terminal-title <title>
+
+Primary setup:
+  1. Run: logwork-helper setup-user
+  2. Paste one printed MCP config into your IDE.
+  3. Restart or reload the IDE MCP tools.
+  4. Ask: Check my logwork for this week.
 
 Commands:
 ${formatCommands()}

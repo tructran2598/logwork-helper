@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { parseLoginArgs, runLoginCommand } from '../auth-cli.mjs';
 import { createAuthDiagnosticsRecorder } from '../lib/auth-diagnostics.mjs';
 import {
+  formatSetupUserInstructions,
   formatTerminalCommandInstructions,
   installUserRuntime,
   linkGlobalBinaries,
@@ -66,6 +67,8 @@ test('CLI dispatcher prints top-level help', () => {
   assert.match(result.stdout, /logwork-helper auth login/);
   assert.match(result.stdout, /logwork-helper mcp/);
   assert.match(result.stdout, /\n  logwork\n/);
+  assert.match(result.stdout, /Primary setup:/);
+  assert.match(result.stdout, /Check my logwork for this week/);
 });
 
 test('CLI dispatcher prints command help without executing setup', () => {
@@ -75,6 +78,8 @@ test('CLI dispatcher prints command help without executing setup', () => {
 
   assert.equal(result.status, 0);
   assert.match(result.stdout, /setup-user \[--login\|--no-login\]/);
+  assert.match(result.stdout, /prints MCP configs/);
+  assert.match(result.stdout, /Paste one printed MCP config into your IDE/);
   assert.match(result.stdout, /--login/);
   assert.equal(result.stderr, '');
 });
@@ -369,6 +374,99 @@ test('setup-user output explains terminal commands and fallback install', () => 
   }), /npm link --global/);
 });
 
+test('setup-user checklist omits auth retry after successful login', () => {
+  const output = formatSetupUserInstructions({
+    targetDir: '/tmp/target-logwork-helper',
+    authResult: { ok: true },
+    linkResult: {
+      linked: true,
+      commandAvailable: true
+    },
+    cleanupResult: {
+      changed: false,
+      changes: []
+    }
+  });
+
+  assert.match(output, /Install status/);
+  assert.match(output, /Next steps/);
+  assert.match(output, /MCP config/);
+  assert.match(output, /Verify/);
+  assert.match(output, /Safety/);
+  assert.match(output, /- Auth: completed/);
+  assert.doesNotMatch(nextStepsSection(output), /logwork-helper auth login/);
+  assert.match(output, /Cursor \/ Antigravity mcp_config\.json:/);
+  assert.match(output, /Codex config\.toml:/);
+  assert.match(output, /GitHub Copilot \/ VS Code mcp\.json:/);
+  assert.match(output, /\/tmp\/target-logwork-helper\/mcp-server\.mjs/);
+});
+
+test('setup-user checklist gives auth retry only when auth is skipped or fails', () => {
+  const skipped = formatSetupUserInstructions({
+    targetDir: '/tmp/target-logwork-helper',
+    authResult: null,
+    linkResult: {
+      linked: true,
+      commandAvailable: true
+    },
+    cleanupResult: {
+      changed: false,
+      changes: []
+    }
+  });
+
+  assert.match(skipped, /- Auth: not run/);
+  assert.match(nextStepsSection(skipped), /logwork-helper auth login/);
+
+  const failed = formatSetupUserInstructions({
+    targetDir: '/tmp/target-logwork-helper',
+    authResult: {
+      ok: false,
+      error: `Invalid password=secret accessToken=${makeJwt()}`
+    },
+    linkResult: {
+      linked: true,
+      commandAvailable: true
+    },
+    cleanupResult: {
+      changed: false,
+      changes: []
+    }
+  });
+
+  assert.match(failed, /- Auth: not completed/);
+  assert.match(failed, /password=<redacted>/);
+  assert.doesNotMatch(failed, /password=secret/);
+  assert.doesNotMatch(failed, /eyJ/);
+  assert.match(nextStepsSection(failed), /logwork-helper auth login/);
+});
+
+test('setup-user checklist preserves link warnings and fallback install guidance', () => {
+  const missingPath = formatSetupUserInstructions({
+    targetDir: '/tmp/target-logwork-helper',
+    linkResult: {
+      linked: true,
+      commandAvailable: false,
+      warning: '`logwork` was linked, but it is not visible on PATH in this shell.'
+    }
+  });
+
+  assert.match(missingPath, /Warning: `logwork` was linked, but it is not visible on PATH/);
+
+  const failedLink = formatSetupUserInstructions({
+    targetDir: '/tmp/target-logwork-helper',
+    linkResult: {
+      linked: false,
+      commandAvailable: false,
+      error: 'ELINKGLOBAL'
+    }
+  });
+
+  assert.match(failedLink, /Terminal command link did not complete/);
+  assert.match(failedLink, /Fallback:\n  npm install -g logwork-helper/);
+  assert.doesNotMatch(failedLink, /npm link --global/);
+});
+
 test('manual parser defaults to REPL and keeps quick compatibility', () => {
   assert.deepEqual(parseManualArgs([]), {
     mode: 'repl',
@@ -425,4 +523,8 @@ function makeJwt() {
     Buffer.from(JSON.stringify({ id: 115, exp: 1781495600 })).toString('base64url'),
     'signature'
   ].join('.');
+}
+
+function nextStepsSection(output) {
+  return String(output).match(/Next steps\n([\s\S]*?)\n\nMCP config/)?.[1] || '';
 }

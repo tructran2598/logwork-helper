@@ -4,6 +4,7 @@ import { constants as fsConstants, promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { redactText } from './lib/auth-redaction.mjs';
 import { isMainModule } from './lib/entrypoint.mjs';
 import { helperHome } from './lib/paths.mjs';
 
@@ -314,49 +315,102 @@ function runAuthLogin(targetDir) {
 }
 
 function printMcpInstructions(targetDir, authResult = null, linkResult = null, cleanupResult = null) {
+  console.log(formatSetupUserInstructions({
+    targetDir,
+    authResult,
+    linkResult,
+    cleanupResult
+  }));
+}
+
+export function formatSetupUserInstructions({
+  targetDir,
+  authResult = null,
+  linkResult = null,
+  cleanupResult = null
+} = {}) {
   const serverPath = resolve(targetDir, 'mcp-server.mjs');
-  console.log(`\nLogwork Helper installed to ${targetDir}.\n`);
-  if (cleanupResult?.changed) {
-    console.log('Removed stale local logwork-helper tarball dependency from runtime metadata.');
-    console.log('');
-  }
-  console.log(formatTerminalCommandInstructions(linkResult));
-  console.log('');
+  const sections = [
+    `Logwork Helper installed to ${targetDir}.`,
+    '',
+    'Install status',
+    `- Runtime: ${targetDir}`,
+    `- Dependencies: installed`,
+    cleanupResult?.changed
+      ? '- Runtime metadata: removed stale local logwork-helper tarball dependency'
+      : '- Runtime metadata: ready',
+    `- Auth: ${formatAuthStatus(authResult)}`,
+    '',
+    formatTerminalCommandInstructions(linkResult),
+    '',
+    'Next steps',
+    ...formatNextSteps(authResult),
+    '',
+    'MCP config',
+    '',
+    'Cursor / Antigravity mcp_config.json:',
+    JSON.stringify({
+      mcpServers: {
+        'logwork-helper': {
+          command: 'node',
+          args: [serverPath]
+        }
+      }
+    }, null, 2),
+    '',
+    'Codex config.toml:',
+    `[mcp_servers.logwork-helper]\ncommand = "node"\nargs = ["${serverPath}"]`,
+    '',
+    'GitHub Copilot / VS Code mcp.json:',
+    JSON.stringify({
+      servers: {
+        logworkHelper: {
+          type: 'stdio',
+          command: 'node',
+          args: [serverPath]
+        }
+      }
+    }, null, 2),
+    '',
+    'Verify',
+    '- Restart or reload your IDE MCP tools after pasting config.',
+    '- In the IDE, ask: Check my logwork for this week.',
+    '- If tools are missing, check the server path points to the mcp-server.mjs path above.',
+    '',
+    'Safety',
+    '- Do not paste passwords, 2FA codes, Bearer tokens, cookies, or raw curl auth logs into AI chat.',
+    '- MCP config only needs command and args; tokens stay in macOS Keychain.',
+    '- Project mappings are stored separately and never store Resource Optimiser tokens.',
+    '',
+    'Optional Git hook install:',
+    `  ${resolve(targetDir, 'setup.sh')} /path/to/project-repo`
+  ];
+
+  return sections.join('\n');
+}
+
+function formatAuthStatus(authResult) {
   if (authResult?.ok) {
-    console.log('Resource Optimiser authentication completed.');
-    console.log('');
-  } else if (authResult?.ok === false) {
-    console.log(`Resource Optimiser authentication did not complete: ${authResult.error}`);
-    console.log('Retry later with:');
-    console.log('  logwork-helper auth login');
-    console.log('');
+    return 'completed';
   }
-  console.log('Authenticate Resource Optimiser:');
-  console.log('  logwork-helper auth login');
-  console.log('');
-  console.log('Cursor / Antigravity MCP config:');
-  console.log(JSON.stringify({
-    mcpServers: {
-      'logwork-helper': {
-        command: 'node',
-        args: [serverPath]
-      }
-    }
-  }, null, 2));
-  console.log('\nCodex config.toml:');
-  console.log(`[mcp_servers.logwork-helper]\ncommand = "node"\nargs = ["${serverPath}"]`);
-  console.log('\nGitHub Copilot / VS Code mcp.json:');
-  console.log(JSON.stringify({
-    servers: {
-      logworkHelper: {
-        type: 'stdio',
-        command: 'node',
-        args: [serverPath]
-      }
-    }
-  }, null, 2));
-  console.log('\nOptional Git hook install:');
-  console.log(`  ${resolve(targetDir, 'setup.sh')} /path/to/project-repo`);
+  if (authResult?.ok === false) {
+    return `not completed (${redactText(authResult.error || 'unknown error')})`;
+  }
+  return 'not run';
+}
+
+function formatNextSteps(authResult) {
+  const steps = [];
+  let index = 1;
+  if (!authResult?.ok) {
+    steps.push(`${index}. Authenticate Resource Optimiser:`);
+    steps.push('   logwork-helper auth login');
+    index += 1;
+  }
+  steps.push(`${index}. Paste one MCP config below into your IDE.`);
+  steps.push(`${index + 1}. Restart or reload your IDE MCP tools.`);
+  steps.push(`${index + 2}. Verify with: Check my logwork for this week.`);
+  return steps;
 }
 
 export function formatTerminalCommandInstructions(linkResult = null) {

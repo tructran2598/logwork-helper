@@ -9,24 +9,24 @@ Logwork Helper is designed for Cursor, Codex, Google Antigravity, GitHub Copilot
 
 ## Quick Start
 
-1. Install the helper and terminal commands:
+1. Install the helper:
 
 ```bash
 npx -y logwork-helper setup-user
 ```
 
-This installs the runtime into `~/.logwork-helper` and links the `logwork` / `logwork-helper` commands globally.
+The installer prints a checklist with install status, next steps, MCP config snippets, verification prompt, and safety reminders.
 
-2. Authenticate Resource Optimiser:
+2. Authenticate Resource Optimiser if setup did not complete auth for you:
 
 ```bash
 logwork-helper auth login
 ```
 
 3. Follow the terminal prompts for email, password, 2FA device, and 2FA code.
-4. Copy the MCP config printed by the installer into your IDE.
+4. Paste one MCP config printed by the installer into your IDE.
 5. Restart or reload your IDE MCP tools.
-6. Ask your AI assistant:
+6. Verify from your AI assistant:
 
 ```text
 Check my logwork for this week.
@@ -62,7 +62,7 @@ yarn global add logwork-helper
 logwork-helper setup-user
 ```
 
-The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, links the `logwork` and `logwork-helper` terminal commands with `npm link`, then prints ready-to-paste MCP configs using your actual macOS path.
+The installer copies the runtime into `~/.logwork-helper`, installs production dependencies, links the `logwork` and `logwork-helper` terminal commands with `npm link`, then prints a ready-to-follow onboarding checklist using your actual macOS path.
 
 To install and start auth immediately:
 
@@ -133,7 +133,7 @@ flowchart TD
 
 ## MCP Setup
 
-Use the exact config printed by `logwork-helper setup-user` when possible. The examples below use `/Users/<user>` as a placeholder.
+Use one exact config block printed by `logwork-helper setup-user` when possible. The examples below use `/Users/<user>` as a placeholder; your installer output will contain the resolved `~/.logwork-helper/mcp-server.mjs` path.
 
 ### Cursor
 
@@ -205,6 +205,12 @@ After editing config, restart/reload the IDE. The MCP server should expose:
 If an MCP tool says auth is required, ask your assistant to call `start_auth_login` or run `logwork-helper auth login` yourself in Terminal. Do not paste passwords or 2FA codes into AI chat.
 
 Templates are also available in `examples/mcp/`.
+
+Verify setup with:
+
+```text
+Check my logwork for this week.
+```
 
 ## Verify With AI Prompts
 
