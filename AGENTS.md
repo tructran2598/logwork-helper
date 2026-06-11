@@ -33,6 +33,24 @@ Tests use the built-in `node:test` framework with `node:assert/strict`. Place ne
 
 The current Git history is minimal (`Initial commit`, `add source`), so use concise imperative commit messages such as `add batch parser validation` or `fix MCP query range handling`. Pull requests should include a short summary, test results, and any manual validation performed. Link related issues when available. Include screenshots or terminal excerpts only for UI prompts, hook behavior, or MCP client setup changes.
 
+## Release Workflow
+
+Use `RELEASE.md` as the deeper checklist, but follow this operational order when publishing a new version:
+
+1. Confirm `main` is clean and synced with `git status --short --branch`.
+2. Run release gates with `npm run release:check`. At minimum, run `git diff --check`, `npm test`, and `npm pack --dry-run --cache /private/tmp/logwork-helper-npm-cache`.
+3. Commit all release-prep, documentation, and package metadata changes before the version bump.
+4. Bump the version with `npm version <version> --no-git-tag-version`.
+5. Re-run pack and diff checks, then commit with `bump version to <version>`.
+6. Push `main` to `origin/main`, not `malcohelper`, unless the user explicitly requests another remote.
+7. Publish npm with `npm whoami`, then `npm publish --access public`. If npm returns `EOTP`, ask the user for the current OTP and retry with `npm publish --access public --otp=<code>`.
+8. Verify npm with `npm view logwork-helper version`.
+9. Create an annotated tag with `git tag -a v<version> -m "v<version>"`, push it with `git push origin v<version>`, then create the GitHub Release with `gh release create v<version> --repo tructran2598/logwork-helper --title v<version> --generate-notes --verify-tag`.
+10. Edit the GitHub Release notes so the top has a concrete `## Summary` section with the main user-facing changes, grouped by module or theme. Do not leave the release body as only a changelog link, and do not include a full compare link unless the user explicitly asks for it.
+11. Verify the release, the remote tag, and final clean status.
+
+Never publish with a dirty worktree. Never run `npm version` again after the version bump commit already exists. Do not include generated `.tgz` artifacts. If GitHub rejects a push because of workflow scope, use a GitHub credential with `workflow` scope rather than changing history. If global Git config has invalid signing fields, use `GIT_CONFIG_GLOBAL=/dev/null` for Git commands.
+
 ## Security & Configuration Tips
 
 Do not commit Resource Optimiser tokens, `.env` files, or machine-specific MCP paths. Auth is read from Safari `localStorage`; keep MCP `cwd` pointed at this repository so optional `.logwork-helper.json` project mappings resolve predictably.
