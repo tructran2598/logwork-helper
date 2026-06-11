@@ -1,7 +1,7 @@
 {
   "name": "logwork-helper",
   "version": "0.1.7",
-  "description": "Local MCP server for querying, previewing, and submitting Resource Optimiser logwork.",
+  "description": "Local-first MCP server and terminal CLI for safe Resource Optimiser logwork automation.",
   "license": "UNLICENSED",
   "type": "module",
   "homepage": "https://github.com/tructran2598/logwork-helper#readme",
@@ -15,9 +15,15 @@
   "keywords": [
     "logwork",
     "resource-optimiser",
-    "mcp",
+    "mcp-server",
+    "ai-assistant",
+    "nodejs",
+    "macos",
+    "keycloak",
     "codex",
     "cursor",
+    "vscode",
+    "claude-code",
     "git-hook"
   ],
   "engines": {
@@ -37,8 +43,10 @@
     "setup.sh",
     "hooks/",
     "lib/",
+    "docs/",
     "examples/mcp/",
     "README.md",
+    "LICENSE",
     "RELEASE.md"
   ],
   "publishConfig": {
