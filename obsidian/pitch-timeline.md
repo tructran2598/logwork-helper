@@ -57,7 +57,7 @@ flowchart TD
 18. [[pitches/P18-integration-fixture-suite|P18 Integration Fixture Suite]]
 19. [[pitches/P19-manual-ui-cleanup-phase-2|P19 Manual UI Cleanup Phase 2]]
 20. [[pitches/P20-review-closure-safety-hardening|P20 Review Closure / Safety Hardening]]
-21. [[pitches/P21-deferred-cleanup-locks-and-helpers|P21 Deferred Cleanup / Locks And Helpers]] implemented, pending commit
+21. [[pitches/P21-deferred-cleanup-locks-and-helpers|P21 Deferred Cleanup / Locks And Helpers]]
 
 ## Dependency Notes
 

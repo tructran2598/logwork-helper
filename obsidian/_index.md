@@ -7,7 +7,7 @@ created: 2026-06-10
 
 # Logwork Helper Pitch Vault
 
-This vault documents the twenty-one safety, reliability, release, and product-surface pitches for Logwork Helper. P21 is implemented and awaiting a local commit.
+This vault documents the twenty-one safety, reliability, release, and product-surface pitches for Logwork Helper. P21 is implemented and committed locally.
 
 ## Navigation
 
@@ -40,7 +40,7 @@ This vault documents the twenty-one safety, reliability, release, and product-su
 | [[pitches/P18-integration-fixture-suite|P18 Integration Fixture Suite]] | testing | `d8824a1` | done | File-based Resource Optimiser normalization fixtures. |
 | [[pitches/P19-manual-ui-cleanup-phase-2|P19 Manual UI Cleanup Phase 2]] | manual UI | `f93ec55` | done | Extracted manual apply-state helpers. |
 | [[pitches/P20-review-closure-safety-hardening|P20 Review Closure / Safety Hardening]] | safety hardening | `96e3c1c` | done | Final closure hardening for approval immutability, duplicate apply prevention, origins, diagnostics privacy, retry hygiene, and test env isolation. |
-| [[pitches/P21-deferred-cleanup-locks-and-helpers|P21 Deferred Cleanup / Locks And Helpers]] | deferred cleanup | `TBD` | implemented | Per-file config/draft locks, shared project/list helpers, and explicit normalization result APIs. |
+| [[pitches/P21-deferred-cleanup-locks-and-helpers|P21 Deferred Cleanup / Locks And Helpers]] | deferred cleanup | `876f3da` | done | Per-file config/draft locks, shared project/list helpers, and explicit normalization result APIs. |
 
 ## Architecture Threads
 
@@ -53,6 +53,6 @@ This vault documents the twenty-one safety, reliability, release, and product-su
 ## Current Git State At Time Of Documentation
 
 - Branch: `main`
-- Local pitch commits documented: 20
-- Implemented pitches pending local commit: 1
+- Local pitch commits documented: 21
+- Implemented pitches pending local commit: 0
 - Push status: not pushed

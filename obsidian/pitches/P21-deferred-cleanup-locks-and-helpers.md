@@ -2,8 +2,8 @@
 type: pitch
 pitch: P21
 title: Deferred Cleanup / Locks And Helpers
-status: implemented
-commit: TBD
+status: done
+commit: 876f3da
 area: deferred-cleanup
 ---
 
@@ -105,7 +105,7 @@ Deferred:
 - Booked-project lookup no longer needs hidden array metadata from its range fetcher.
 - Legacy normalization APIs remain backward compatible.
 - Focused tests and full `npm test` pass.
-- Local commit is pending.
+- Local implementation commit created: `876f3da`.
 - No `git push` is performed.
 
 ## Related Files
