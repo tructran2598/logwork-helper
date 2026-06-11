@@ -56,7 +56,9 @@ import {
 } from '../lib/manual-ink-app.mjs';
 import {
   StatusBar as DirectStatusBar,
+  commandInputKey,
   commandItems,
+  completeCommandValue,
   loadingMessageForCommand,
   sameProjectIdentity
 } from '../lib/manual-ink-ui.mjs';
@@ -213,6 +215,10 @@ test('Ink manual app re-exports maintain UI and auth module compatibility', () =
   assert.equal(AuthPrompt, DirectAuthPrompt);
   assert.equal(loadingMessageForCommand({ type: 'query' }), 'Fetching Resource Optimiser timesheet...');
   assert.equal(sameProjectIdentity({ projectMemberId: 5234 }, { projectMemberId: '5234' }), true);
+  assert.equal(commandInputKey('command', 2), 'command:2');
+  assert.equal(completeCommandValue('/lo', [{ name: '/logwork' }], 0), '/logwork');
+  assert.equal(completeCommandValue('/logwork', [{ name: '/logwork' }], 0), null);
+  assert.equal(completeCommandValue('/query today', [{ name: '/query' }], 0), null);
   assert.ok(commandItems().some((item) => item.value === '/query'));
   assert.match(renderToString(h(DirectStatusBar, {
     preview: null,
