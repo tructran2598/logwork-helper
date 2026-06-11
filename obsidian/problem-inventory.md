@@ -6,7 +6,7 @@ status: done
 
 # Problem Inventory
 
-This inventory captures the problem set that drove the twenty executed or implemented safety, reliability, release, and product-surface pitches.
+This inventory captures the problem set that drove the twenty-one executed or implemented safety, reliability, release, and product-surface pitches.
 
 ## P0 Product Risks
 
@@ -30,6 +30,7 @@ This inventory captures the problem set that drove the twenty executed or implem
 18. API normalization needed file-based fixtures for Resource Optimiser contract drift.
 19. Manual apply UI logic needed pure helper extraction for maintainability.
 20. Final release closure needed hardening around approval immutability, duplicate apply prevention, HTTPS/origin policy, diagnostics privacy, retry hygiene, normalization fallback, and test env isolation.
+21. Deferred cleanup needed per-file config/draft locks, shared project/list helpers, and an explicit normalization result API without breaking existing callers.
 
 ## Safety Principles
 
@@ -45,6 +46,7 @@ This inventory captures the problem set that drove the twenty executed or implem
 - Concurrent write attempts should be rejected or serialized explicitly.
 - Production network origins should not silently downgrade from HTTPS.
 - Tests that mutate process-wide state must restore it reliably.
+- Compatibility cleanup should prefer additive APIs before breaking existing call contracts.
 
 ## Pitch Coverage
 
@@ -67,4 +69,5 @@ This inventory captures the problem set that drove the twenty executed or implem
 - P17 covered problem 17.
 - P18 covered problem 18.
 - P19 covered problem 19.
-- P20 covered problem 20, with general config/draft locks and shared helper refactors deferred until a focused failing test proves they are needed.
+- P20 covered problem 20.
+- P21 covered problem 21 and closed the prioritized P20 deferred cleanup items.

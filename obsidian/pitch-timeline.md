@@ -32,6 +32,7 @@ flowchart TD
   P9 --> P15
   P15 --> P20
   P19 --> P20
+  P20 --> P21["P21 Deferred Cleanup / Locks And Helpers"]
 ```
 
 ## Ordered Execution
@@ -55,7 +56,8 @@ flowchart TD
 17. [[pitches/P17-safer-apply-ux|P17 Safer Apply UX]]
 18. [[pitches/P18-integration-fixture-suite|P18 Integration Fixture Suite]]
 19. [[pitches/P19-manual-ui-cleanup-phase-2|P19 Manual UI Cleanup Phase 2]]
-20. [[pitches/P20-review-closure-safety-hardening|P20 Review Closure / Safety Hardening]] implemented, pending commit
+20. [[pitches/P20-review-closure-safety-hardening|P20 Review Closure / Safety Hardening]]
+21. [[pitches/P21-deferred-cleanup-locks-and-helpers|P21 Deferred Cleanup / Locks And Helpers]] implemented, pending commit
 
 ## Dependency Notes
 
@@ -70,4 +72,5 @@ flowchart TD
 - P17 made write approval easier to review before apply.
 - P18 added fixture-based API contract coverage.
 - P19 continued manual UI maintainability after the manual REPL direction was clearer.
-- P20 closed the final release-review safety pass across approval immutability, duplicate apply prevention, HTTPS/origin rules, diagnostics privacy, retry hygiene, normalization fallback, and test env isolation. General config/draft locks and shared helper refactors stayed deferred because no focused failing test justified them.
+- P20 closed the final release-review safety pass across approval immutability, duplicate apply prevention, HTTPS/origin rules, diagnostics privacy, retry hygiene, normalization fallback, and test env isolation.
+- P21 handled the prioritized P20 deferred cleanup: per-file config/draft locks, shared project identity and list navigation helpers, and explicit normalization result APIs with backward compatibility.

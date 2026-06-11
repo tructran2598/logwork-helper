@@ -5,8 +5,10 @@ import {
   getDayLogs,
   getNormalizationDiagnostics,
   getTimesheetRange,
+  getTimesheetRangeResult,
   normalizeLogtimeEntries,
-  normalizeTimesheetRange
+  normalizeTimesheetRange,
+  normalizeTimesheetRangeResult
 } from '../lib/api.mjs';
 
 test('apiFetch retries idempotent read failures and returns successful response', async () => {
@@ -97,6 +99,47 @@ test('getTimesheetRange builds expected query params', async () => {
   }
 });
 
+test('getTimesheetRangeResult builds expected query params and returns explicit normalization shape', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl;
+  globalThis.fetch = async (url) => {
+    requestedUrl = new URL(url);
+    return new Response(JSON.stringify({
+      data: [
+        {
+          date: '2026-06-05',
+          project_member_id: 5352,
+          project_id: 100,
+          project_name: 'Course Builder',
+          booked_hours: 'bad-hours',
+          logged_hours: 0
+        }
+      ]
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  };
+
+  try {
+    const result = await getTimesheetRangeResult('token', 115, {
+      from: '2026-06-05',
+      to: '2026-06-06'
+    });
+
+    assert.equal(requestedUrl.pathname, '/api/v1/member-logtime/timesheet');
+    assert.equal(requestedUrl.searchParams.get('f_user_id'), '115');
+    assert.equal(requestedUrl.searchParams.get('f_from'), '2026-06-05T00:00:00.000Z');
+    assert.equal(requestedUrl.searchParams.get('f_to'), '2026-06-06T00:00:00.000Z');
+    assert.deepEqual(Object.keys(result).sort(), ['normalization', 'records']);
+    assert.equal(result.records.length, 1);
+    assert.equal(result.normalization.status, 'warning');
+    assert.deepEqual(result.normalization.warnings.map((warning) => warning.reason), ['invalid_hours']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('normalizeTimesheetRange returns day/project records and totals duplicate rows', () => {
   const records = normalizeTimesheetRange({
     data: [
@@ -171,6 +214,53 @@ test('normalizeTimesheetRange returns day/project records and totals duplicate r
       }
     ]
   });
+});
+
+test('normalizeTimesheetRangeResult returns explicit records and normalization metadata', () => {
+  const result = normalizeTimesheetRangeResult({
+    data: [
+      {
+        date: '2026-06-05',
+        project_member_id: 5352,
+        project_id: 100,
+        project_name: 'Course Builder',
+        booked_hours: 'bad-hours',
+        logged_hours: 0
+      }
+    ]
+  }, {
+    from: '2026-06-05',
+    to: '2026-06-06'
+  });
+
+  assert.deepEqual(Object.keys(result).sort(), ['normalization', 'records']);
+  assert.equal(result.records.length, 1);
+  assert.equal(result.records[0].bookedHours, 0);
+  assert.equal(result.normalization.status, 'warning');
+  assert.deepEqual(result.normalization.warnings.map((warning) => warning.reason), ['invalid_hours']);
+  assert.deepEqual(getNormalizationDiagnostics(result.records), result.normalization);
+});
+
+test('normalizeTimesheetRange keeps legacy array return shape for compatibility', () => {
+  const records = normalizeTimesheetRange({
+    data: [
+      {
+        date: '2026-06-05',
+        project_member_id: 5352,
+        project_id: 100,
+        project_name: 'Course Builder',
+        booked_hours: 'bad-hours',
+        logged_hours: 0
+      }
+    ]
+  }, {
+    from: '2026-06-05',
+    to: '2026-06-06'
+  });
+
+  assert.equal(Array.isArray(records), true);
+  assert.deepEqual(Object.keys(records), ['0']);
+  assert.equal(getNormalizationDiagnostics(records).status, 'warning');
 });
 
 test('normalizeTimesheetRange expands real project timesheet shape and ignores overall', () => {

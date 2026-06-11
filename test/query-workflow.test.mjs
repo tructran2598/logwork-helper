@@ -7,7 +7,8 @@ import {
   queryLogwork
 } from '../lib/query-workflow.mjs';
 import {
-  normalizeTimesheetRange
+  normalizeTimesheetRange,
+  normalizeTimesheetRangeResult
 } from '../lib/api.mjs';
 
 const records = [
@@ -166,6 +167,36 @@ test('queryLogwork exposes normalization warnings without changing query fields'
   ]);
   assert.equal(result.totals.bookedHours, 0);
   assert.equal(result.days[0].projects[0].bookedHours, 0);
+  assert.equal(result.normalization.status, 'warning');
+  assert.deepEqual(result.normalization.warnings.map((warning) => warning.reason), ['invalid_hours']);
+});
+
+test('queryLogwork accepts explicit range records and normalization result', async () => {
+  const rangeResult = normalizeTimesheetRangeResult({
+    data: [
+      {
+        date: '2026-06-05',
+        project_member_id: 5352,
+        project_id: 100,
+        project_name: 'Course Builder',
+        booked_hours: 4,
+        logged_hours: 'bad-hours'
+      }
+    ]
+  }, {
+    from: '2026-06-05',
+    to: '2026-06-06'
+  });
+
+  const result = await queryLogwork({
+    date: '2026-06-05',
+    includeEntries: false,
+    cwd: '/private/tmp/no-config-here',
+    fetchRange: async () => rangeResult
+  });
+
+  assert.equal(result.totals.bookedHours, 4);
+  assert.equal(result.totals.loggedHours, 0);
   assert.equal(result.normalization.status, 'warning');
   assert.deepEqual(result.normalization.warnings.map((warning) => warning.reason), ['invalid_hours']);
 });

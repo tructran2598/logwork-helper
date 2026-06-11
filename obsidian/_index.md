@@ -7,7 +7,7 @@ created: 2026-06-10
 
 # Logwork Helper Pitch Vault
 
-This vault documents the twenty safety, reliability, release, and product-surface pitches for Logwork Helper. P20 is implemented and awaiting a local commit.
+This vault documents the twenty-one safety, reliability, release, and product-surface pitches for Logwork Helper. P21 is implemented and awaiting a local commit.
 
 ## Navigation
 
@@ -40,18 +40,19 @@ This vault documents the twenty safety, reliability, release, and product-surfac
 | [[pitches/P18-integration-fixture-suite|P18 Integration Fixture Suite]] | testing | `d8824a1` | done | File-based Resource Optimiser normalization fixtures. |
 | [[pitches/P19-manual-ui-cleanup-phase-2|P19 Manual UI Cleanup Phase 2]] | manual UI | `f93ec55` | done | Extracted manual apply-state helpers. |
 | [[pitches/P20-review-closure-safety-hardening|P20 Review Closure / Safety Hardening]] | safety hardening | `96e3c1c` | done | Final closure hardening for approval immutability, duplicate apply prevention, origins, diagnostics privacy, retry hygiene, and test env isolation. |
+| [[pitches/P21-deferred-cleanup-locks-and-helpers|P21 Deferred Cleanup / Locks And Helpers]] | deferred cleanup | `TBD` | implemented | Per-file config/draft locks, shared project/list helpers, and explicit normalization result APIs. |
 
 ## Architecture Threads
 
 - Safety before writes: [[pitches/P1-project-resolution-safety]], [[pitches/P6-mcp-preview-approval-safety]], [[pitches/P10-mcp-apply-provenance-hardening]], [[pitches/P17-safer-apply-ux]], [[pitches/P20-review-closure-safety-hardening]]
 - Auth and supportability: [[pitches/P2-auth-resilience]], [[pitches/P8-diagnostics-config-snapshot]], [[pitches/P11-auth-protocol-validation]], [[pitches/P16-doctor-diagnostics-command]]
 - Product surface clarity: [[pitches/P3-product-surface-onboarding]], [[pitches/P5-manual-ui-maintainability]], [[pitches/P19-manual-ui-cleanup-phase-2]]
-- Data correctness: [[pitches/P4-api-normalization-contract]], [[pitches/P7-project-mapping-config-hygiene]], [[pitches/P18-integration-fixture-suite]]
-- Release and operations: [[pitches/P12-network-reliability-policy]], [[pitches/P13-release-engineering-checks]], [[pitches/P14-environment-config-overrides]], [[pitches/P15-local-state-integrity]]
+- Data correctness: [[pitches/P4-api-normalization-contract]], [[pitches/P7-project-mapping-config-hygiene]], [[pitches/P18-integration-fixture-suite]], [[pitches/P21-deferred-cleanup-locks-and-helpers]]
+- Release and operations: [[pitches/P12-network-reliability-policy]], [[pitches/P13-release-engineering-checks]], [[pitches/P14-environment-config-overrides]], [[pitches/P15-local-state-integrity]], [[pitches/P21-deferred-cleanup-locks-and-helpers]]
 
 ## Current Git State At Time Of Documentation
 
 - Branch: `main`
-- Local pitch commits documented: 19
+- Local pitch commits documented: 20
 - Implemented pitches pending local commit: 1
 - Push status: not pushed
