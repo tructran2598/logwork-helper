@@ -39,7 +39,7 @@ This vault documents the twenty safety, reliability, release, and product-surfac
 | [[pitches/P17-safer-apply-ux|P17 Safer Apply UX]] | apply UX | `09745dc` | done | Approval and submission summaries for safer writes. |
 | [[pitches/P18-integration-fixture-suite|P18 Integration Fixture Suite]] | testing | `d8824a1` | done | File-based Resource Optimiser normalization fixtures. |
 | [[pitches/P19-manual-ui-cleanup-phase-2|P19 Manual UI Cleanup Phase 2]] | manual UI | `f93ec55` | done | Extracted manual apply-state helpers. |
-| [[pitches/P20-review-closure-safety-hardening|P20 Review Closure / Safety Hardening]] | safety hardening | TBD | implemented_pending_commit | Final closure hardening for approval immutability, duplicate apply prevention, origins, diagnostics privacy, retry hygiene, and test env isolation. |
+| [[pitches/P20-review-closure-safety-hardening|P20 Review Closure / Safety Hardening]] | safety hardening | `96e3c1c` | done | Final closure hardening for approval immutability, duplicate apply prevention, origins, diagnostics privacy, retry hygiene, and test env isolation. |
 
 ## Architecture Threads
 

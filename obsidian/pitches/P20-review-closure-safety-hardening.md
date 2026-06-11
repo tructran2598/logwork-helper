@@ -2,8 +2,8 @@
 type: pitch
 pitch: P20
 title: Review Closure / Safety Hardening
-status: implemented_pending_commit
-commit: TBD
+status: done
+commit: 96e3c1c
 area: safety-hardening
 ---
 
