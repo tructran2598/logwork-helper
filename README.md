@@ -210,6 +210,27 @@ Add this to workspace `.vscode/mcp.json` or your VS Code user MCP config:
 }
 ```
 
+### Claude Code
+
+Add the server from Terminal:
+
+```bash
+claude mcp add --transport stdio logwork-helper -- node "/Users/<user>/.logwork-helper/mcp-server.mjs"
+```
+
+Or add this to project `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "logwork-helper": {
+      "command": "node",
+      "args": ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
+    }
+  }
+}
+```
+
 After editing config, restart/reload the IDE. The MCP server should expose:
 
 - `query_logwork`
@@ -418,11 +439,14 @@ Useful commands inside the session:
 /query today
 /query this-week
 /logwork
+/mcp
 /projects
 /projects 5234
 /map SCB 5234
 /diagnostics
 ```
+
+Use `/mcp` to choose Cursor, Antigravity, GitHub Copilot / VS Code, Claude Code, or Codex and print copy-ready MCP setup for that client. You can also jump directly with `/mcp cursor`, `/mcp antigravity`, `/mcp copilot`, `/mcp claude-code`, or `/mcp codex`.
 
 `/logwork` opens a guided flow: pick a day in the current week, pick a Resource Optimiser project, then enter one task per line:
 

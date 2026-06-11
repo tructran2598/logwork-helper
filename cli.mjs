@@ -79,6 +79,7 @@ Commands inside the REPL:
   /query today
   /query this-week
   /logwork
+  /mcp
   /projects
   /projects 5234
   /map SCB 5234

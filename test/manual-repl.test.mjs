@@ -46,6 +46,7 @@ import {
   DatePicker,
   DraftPicker,
   HeaderBar,
+  McpClientPicker,
   OutputPanel,
   ProjectPicker,
   ProjectChart,
@@ -65,12 +66,17 @@ import {
 import {
   AuthPrompt as DirectAuthPrompt
 } from '../lib/manual-ink-auth.mjs';
+import {
+  formatMcpSetup,
+  resolveMcpClientSelection
+} from '../lib/manual-mcp.mjs';
 
 const h = React.createElement;
 
 test('manual command registry renders help and slash suggestions', () => {
   assert.match(formatManualHelp(), /\/query today/);
   assert.match(formatManualHelp(), /\/logwork/);
+  assert.match(formatManualHelp(), /\/mcp \[cursor\|antigravity\|copilot\|claude-code\|codex\]/);
   assert.match(formatManualHelp(), /\/diagnostics/);
   assert.doesNotMatch(formatManualHelp(), /\/apply/);
   assert.doesNotMatch(formatManualHelp(), /\/exit|\/quit/);
@@ -78,12 +84,15 @@ test('manual command registry renders help and slash suggestions', () => {
   assert.match(formatManualHelp(), /\/projects \[projectMemberId\|projectId\|name\]/);
   assert.deepEqual(getCommandSuggestions('/q').map((command) => command.name), ['/query']);
   assert.deepEqual(getCommandSuggestions('/lo').map((command) => command.name), ['/logwork']);
+  assert.deepEqual(getCommandSuggestions('/mc').map((command) => command.name), ['/mcp']);
   assert.deepEqual(getCommandSuggestions('/ap').map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/e').map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/pre').map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/pro').map((command) => command.name), ['/projects']);
   assert.deepEqual(getCommandSuggestions('/di').map((command) => command.name), ['/diagnostics']);
   assert.match(renderCommandSuggestions('/pro'), /\/projects\s+List projects with weekly booked\/logged chart/);
+  assert.match(renderCommandSuggestions('/mc'), /\/mcp\s+Show copy-ready MCP setup for an IDE/);
+  assert.match(renderCommandSuggestions('/'), /\/mcp\s+Show copy-ready MCP setup for an IDE/);
   assert.deepEqual(getCommandSuggestions('/a', TASK_COMMANDS).map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/s', TASK_COMMANDS).map((command) => command.name), ['/save']);
   assert.deepEqual(getCommandSuggestions('/d', TASK_COMMANDS).map((command) => command.name), ['/drafts', '/diagnostics']);
@@ -98,6 +107,10 @@ test('Ink manual components render shell, current panel, pickers, menu, status, 
     suggestions: getCommandSuggestions('/pro'),
     selectedIndex: 0
   })), /\/projects/);
+  assert.match(renderToString(h(SlashMenu, {
+    suggestions: getCommandSuggestions('/'),
+    selectedIndex: 0
+  })), /\/mcp/);
   assert.match(renderToString(h(CurrentPanel, {
     panel: { kind: 'error', title: 'Current', text: 'Something failed' }
   })), /Something failed/);
@@ -208,6 +221,18 @@ test('Ink manual components render shell, current panel, pickers, menu, status, 
     onStartNew() {},
     onCancel() {}
   })), /Start new logwork session/);
+  assert.match(renderToString(h(McpClientPicker, {
+    selectedIndex: 0,
+    onChange() {},
+    onSelect() {},
+    onCancel() {}
+  })), /Pick MCP client/);
+  assert.match(renderToString(h(McpClientPicker, {
+    selectedIndex: 0,
+    onChange() {},
+    onSelect() {},
+    onCancel() {}
+  })), /Cursor/);
 });
 
 test('Ink manual app re-exports maintain UI and auth module compatibility', () => {
@@ -311,6 +336,18 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
     type: 'logwork',
     text: undefined
   });
+  assert.deepEqual(parseManualCommand('/mcp'), {
+    type: 'mcp',
+    client: undefined
+  });
+  assert.deepEqual(parseManualCommand('/mcp cursor'), {
+    type: 'mcp',
+    client: 'cursor'
+  });
+  assert.deepEqual(parseManualCommand('/mcp claude code'), {
+    type: 'mcp',
+    client: 'claude-code'
+  });
   assert.deepEqual(parseManualCommand('/diagnostics'), { type: 'diagnostics' });
   assert.deepEqual(parseManualCommand('/apply'), { type: 'apply' });
   assert.deepEqual(parseManualCommand('/projects'), {
@@ -330,7 +367,56 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
   assert.throws(() => parseManualCommand('/quit'), /Unknown command/);
   assert.throws(() => parseManualCommand('/query sometime'), /Usage: \/query/);
   assert.throws(() => parseManualCommand('/preview'), /Unknown command/);
+  assert.throws(() => parseManualCommand('/mcp unknown'), /Unknown MCP client/);
   assert.throws(() => parseManualCommand('/unknown'), /Unknown command/);
+});
+
+test('manual MCP setup formats copy-ready client configs', async () => {
+  const serverPath = '/tmp/logwork-helper/mcp-server.mjs';
+  const cursor = formatMcpSetup({
+    client: 'cursor',
+    serverPath
+  });
+  assert.match(cursor, /MCP setup: Cursor/);
+  assert.match(cursor, /"mcpServers"/);
+  assert.match(cursor, /"args": \[\s+"\/tmp\/logwork-helper\/mcp-server\.mjs"/);
+
+  const copilot = formatMcpSetup({
+    client: 'copilot',
+    serverPath
+  });
+  assert.match(copilot, /GitHub Copilot \/ VS Code/);
+  assert.match(copilot, /"servers"/);
+  assert.match(copilot, /"type": "stdio"/);
+
+  const claude = formatMcpSetup({
+    client: 'claude-code',
+    serverPath
+  });
+  assert.match(claude, /claude mcp add --transport stdio logwork-helper -- node/);
+  assert.match(claude, /project \.mcp\.json/);
+
+  const codex = formatMcpSetup({
+    client: 'codex',
+    serverPath
+  });
+  assert.match(codex, /\[mcp_servers\.logwork-helper\]/);
+  assert.match(codex, /tool_timeout_sec = 120/);
+
+  assert.equal(resolveMcpClientSelection('2')?.key, 'antigravity');
+  assert.equal(resolveMcpClientSelection('github copilot')?.key, 'copilot');
+});
+
+test('manual MCP command prompts for client and prints setup', async () => {
+  const printed = [];
+  await executeManualCommand(parseManualCommand('/mcp'), createManualSession(), context({
+    printed,
+    lines: ['2']
+  }));
+
+  assert.match(printed.join('\n'), /Choose MCP client/);
+  assert.match(printed.join('\n'), /MCP setup: Google Antigravity/);
+  assert.match(printed.join('\n'), /"mcpServers"/);
 });
 
 test('manual query prints grouped logwork summary', async () => {
