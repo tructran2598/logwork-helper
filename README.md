@@ -1,8 +1,8 @@
 # Logwork Helper
 
-[![npm version](https://img.shields.io/npm/v/logwork-helper.svg)](https://www.npmjs.com/package/logwork-helper)
-[![npm downloads](https://img.shields.io/npm/dm/logwork-helper.svg)](https://www.npmjs.com/package/logwork-helper)
-[![license](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+[npm version](https://www.npmjs.com/package/logwork-helper)
+[npm downloads](https://www.npmjs.com/package/logwork-helper)
+[license](LICENSE)
 
 Local MCP server and terminal CLI for Resource Optimiser logwork.
 
@@ -27,7 +27,7 @@ npm install -g logwork-helper
 Prepare the local runtime used by MCP configs:
 
 ```bash
-logwork-helper setup-user --no-login
+logwork-helper setup-user
 ```
 
 This creates `~/.logwork-helper`, installs runtime dependencies there, links the terminal commands, and prints copy-ready MCP config snippets using your real local path.

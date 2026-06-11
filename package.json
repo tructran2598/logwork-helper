@@ -2,7 +2,7 @@
   "name": "logwork-helper",
   "version": "0.1.8",
   "description": "Local-first MCP server and terminal CLI for safe Resource Optimiser logwork automation.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "homepage": "https://github.com/tructran2598/logwork-helper#readme",
   "bugs": {
