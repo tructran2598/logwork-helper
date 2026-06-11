@@ -50,6 +50,14 @@ test('buildConfig fails fast for invalid URL and numeric overrides', () => {
   }), /LOGWORK_API_BASE must be a valid http\(s\) URL/);
 
   assert.throws(() => buildConfig({
+    LOGWORK_API_BASE: 'http://api.example.com/api/v1'
+  }), /LOGWORK_API_BASE must use HTTPS unless it points to localhost or loopback/);
+
+  assert.equal(buildConfig({
+    LOGWORK_API_BASE: 'http://localhost:3000/api/v1'
+  }).apiBase, 'http://localhost:3000/api/v1');
+
+  assert.throws(() => buildConfig({
     LOGWORK_HTTP_TIMEOUT_MS: '0'
   }), /LOGWORK_HTTP_TIMEOUT_MS must be a positive integer/);
 

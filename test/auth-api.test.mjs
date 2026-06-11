@@ -408,6 +408,35 @@ test('authenticateWithApi blocks off-domain Keycloak form actions before credent
   );
 });
 
+test('authenticateWithApi blocks insecure Keycloak form actions before credentials', async () => {
+  let credentialsRequested = false;
+
+  await assert.rejects(
+    authenticateWithApi({
+      keycloakState: 'state-value',
+      keycloakNonce: 'nonce-value',
+      fetchImpl: async () => htmlResponse(`
+        <form action="http://keycloak.vinova.sg/auth/realms/resource/login-actions/authenticate" method="post">
+          <input name="username">
+          <input name="password" type="password">
+        </form>
+      `),
+      credentialProvider: {
+        async requestCredentials() {
+          credentialsRequested = true;
+          throw new Error('credentials should not be requested');
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 'API_AUTH_FAILED');
+      assert.match(error.message, /must use HTTPS/);
+      assert.equal(credentialsRequested, false);
+      return true;
+    }
+  );
+});
+
 test('authenticateWithApi blocks off-domain auth redirects', async () => {
   await assert.rejects(
     authenticateWithApi({
@@ -423,6 +452,31 @@ test('authenticateWithApi blocks off-domain auth redirects', async () => {
     (error) => {
       assert.equal(error.code, 'API_AUTH_FAILED');
       assert.match(error.message, /Blocked auth redirect/);
+      return true;
+    }
+  );
+});
+
+test('authenticateWithApi blocks Keycloak token endpoint origin mismatch', async () => {
+  let called = false;
+
+  await assert.rejects(
+    authenticateWithApi({
+      keycloakTokenUrl: 'https://evil.example/auth/realms/resource/protocol/openid-connect/token',
+      fetchImpl: async () => {
+        called = true;
+        throw new Error('fetch should not be called');
+      },
+      credentialProvider: {
+        async requestCredentials() {
+          throw new Error('credentials should not be requested');
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 'API_AUTH_FAILED');
+      assert.match(error.message, /token endpoint origin did not match/);
+      assert.equal(called, false);
       return true;
     }
   );

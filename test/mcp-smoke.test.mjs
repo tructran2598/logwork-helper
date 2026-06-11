@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
+  assertNoFinalProjectOverrides,
+  consumeApprovedBatch,
   getCachedPreview,
   resolveApprovedBatch,
   setCachedPreview
@@ -41,6 +43,7 @@ test('MCP server lists logwork tools over stdio', async () => {
     ]);
     const applyTool = result.tools.find((tool) => tool.name === 'apply_logwork_batch');
     assert.equal(applyTool.inputSchema.properties.allowUnbooked.type, 'boolean');
+    assert.equal(applyTool.inputSchema.properties.projectOverrides.type, 'object');
     const setupTool = result.tools.find((tool) => tool.name === 'upsert_project_mapping');
     assert.equal(setupTool.inputSchema.properties.confirm.type, 'boolean');
     assert.deepEqual(setupTool.inputSchema.properties.scope.enum, ['user', 'project']);
@@ -62,6 +65,12 @@ test('MCP server lists logwork tools over stdio', async () => {
   } finally {
     await client.close();
   }
+});
+
+test('MCP apply rejects final project overrides at boundary', () => {
+  assert.throws(() => assertNoFinalProjectOverrides({
+    entry_1: 5352
+  }), /no longer accepts final projectOverrides/);
 });
 
 test('MCP preview cache expires old previews and caps stored batches', () => {
@@ -175,6 +184,27 @@ test('MCP apply accepts matching batch echo but uses cached preview', () => {
   assert.equal(approved.summary, preview.summary);
   matchingEcho.entries[0].taskName = 'mutated after approval';
   assert.equal(getCachedPreview(cache, preview.batchId, now).entries[0].taskName, preview.entries[0].taskName);
+});
+
+test('MCP apply consumes cached approval before submit work can await', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedPreview();
+  setCachedPreview(cache, preview, now);
+
+  const approved = consumeApprovedBatch({
+    cache,
+    batchId: preview.batchId,
+    now
+  });
+
+  assert.equal(approved.entries[0].taskName, 'original task');
+  assert.equal(getCachedPreview(cache, preview.batchId, now), null);
+  assert.throws(() => consumeApprovedBatch({
+    cache,
+    batchId: preview.batchId,
+    now
+  }), /Missing cached preview/);
 });
 
 function createApprovedPreview() {

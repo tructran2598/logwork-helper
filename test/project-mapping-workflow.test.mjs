@@ -19,6 +19,7 @@ import {
   upsertProjectMapping
 } from '../lib/project-mapping-workflow.mjs';
 import { previewLogworkBatch } from '../lib/batch-workflow.mjs';
+import { restoreEnv, snapshotEnv } from './helpers/env.mjs';
 
 const projects = [
   {
@@ -27,6 +28,11 @@ const projects = [
     projectName: '2621A-SIT-HTML BUILDER-PRJ'
   }
 ];
+const envSnapshot = snapshotEnv(['HOME', 'LOGWORK_HELPER_HOME']);
+
+test.afterEach(() => {
+  restoreEnv(envSnapshot);
+});
 
 test('upsertProjectMapping creates .logwork-helper.json and preview can use it', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'logwork-helper-test-'));

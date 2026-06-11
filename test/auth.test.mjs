@@ -247,6 +247,23 @@ test('refreshResourceOptimiserSession diagnostics do not leak tokens', async () 
   );
 });
 
+test('refreshResourceOptimiserSession rejects non-local HTTP API base', async () => {
+  await assert.rejects(
+    refreshResourceOptimiserSession({
+      session: {
+        accessToken: makeRoJwt({ exp: pastExp() }),
+        refreshToken: makeRoJwt({ exp: futureExp() })
+      },
+      apiBase: 'http://api.resourceoptimiser.com/api/v1',
+      refreshTokenPath: '/auth/refresh-token',
+      fetchImpl: async () => {
+        throw new Error('fetch should not be called');
+      }
+    }),
+    /must use HTTPS/
+  );
+});
+
 function memoryStorage(initialValue = null) {
   let current = initialValue;
   return {

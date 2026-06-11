@@ -7,6 +7,7 @@ import {
   diagnosticsReportPath,
   generateDiagnosticsReport
 } from '../lib/diagnostics.mjs';
+import { withEnv } from './helpers/env.mjs';
 
 function makeJwt() {
   return 'eyJhbGciOiJIUzI1NiJ9.eyJpZCI6MTE1LCJlbWFpbCI6Im1hcnRpbkB2aW5vdmEuY29tLnNnIn0.signature';
@@ -14,9 +15,7 @@ function makeJwt() {
 
 test('generateDiagnosticsReport writes sanitized support report', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'logwork-diagnostics-'));
-  const previousHome = process.env.LOGWORK_HELPER_HOME;
-  process.env.LOGWORK_HELPER_HOME = dir;
-  try {
+  await withEnv({ LOGWORK_HELPER_HOME: dir }, async () => {
     await mkdir(dir, { recursive: true });
     const cwd = join(dir, 'project');
     await mkdir(cwd, { recursive: true });
@@ -85,8 +84,13 @@ test('generateDiagnosticsReport writes sanitized support report', async () => {
     assert.match(report, /apiHost: api\.resourceoptimiser\.com/);
     assert.match(report, /keycloakHost: keycloak\.vinova\.sg/);
     assert.match(report, /mappingCount: 2/);
-    assert.match(report, /"tickets":\["SCB"\]/);
-    assert.match(report, /"tickets":\["OPS"\]/);
+    assert.match(report, /mappingTicketCount: 2/);
+    assert.match(report, /mappingKeywordCount: 1/);
+    assert.match(report, /mappingDetails: <redacted; set LOGWORK_DIAGNOSTICS_INCLUDE_MAPPINGS=1 to include mapping details>/);
+    assert.doesNotMatch(report, /"tickets":\["SCB"\]/);
+    assert.doesNotMatch(report, /"tickets":\["OPS"\]/);
+    assert.doesNotMatch(report, /Course Builder/);
+    assert.doesNotMatch(report, /Operations/);
     assert.match(report, /projectConfig: exists/);
     assert.match(report, /Auth Status/);
     assert.doesNotMatch(report, /secret-password/);
@@ -98,27 +102,46 @@ test('generateDiagnosticsReport writes sanitized support report', async () => {
     assert.doesNotMatch(report, /tab_id=t4/);
     assert.doesNotMatch(report, /eyJ/);
     assert.doesNotMatch(report, /<html>/);
-  } finally {
-    if (previousHome === undefined) {
-      delete process.env.LOGWORK_HELPER_HOME;
-    } else {
-      process.env.LOGWORK_HELPER_HOME = previousHome;
-    }
-  }
+  });
+});
+
+test('generateDiagnosticsReport can include mapping details with explicit opt-in', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'logwork-diagnostics-mapping-opt-in-'));
+  await withEnv({ LOGWORK_HELPER_HOME: dir }, async () => {
+    await mkdir(dir, { recursive: true });
+    const cwd = join(dir, 'project');
+    await mkdir(cwd, { recursive: true });
+    await writeFile(join(dir, '.logwork-helper.json'), JSON.stringify({
+      projectMappings: [
+        {
+          projectName: 'Course Builder',
+          projectMemberId: 5234,
+          tickets: ['SCB'],
+          keywords: ['support keyword']
+        }
+      ]
+    }), 'utf8');
+
+    const outputPath = join(dir, 'diagnostics', 'report.txt');
+    await generateDiagnosticsReport({
+      outputPath,
+      cwd,
+      includeMappingDetails: true,
+      commandFinder: async () => ({ available: false, path: null }),
+      authStatusFn: async () => ({ authenticated: false }),
+      mcpSmokeFn: async () => ({ ok: true, toolCount: 0, tools: [] })
+    });
+
+    const report = await readFile(outputPath, 'utf8');
+    assert.match(report, /Course Builder/);
+    assert.match(report, /"tickets":\["SCB"\]/);
+  });
 });
 
 test('diagnosticsReportPath writes inside helper diagnostics directory', () => {
   const dir = '/tmp/logwork-helper-home-test';
-  const previousHome = process.env.LOGWORK_HELPER_HOME;
-  process.env.LOGWORK_HELPER_HOME = dir;
-  try {
+  return withEnv({ LOGWORK_HELPER_HOME: dir }, async () => {
     const path = diagnosticsReportPath(new Date('2026-06-09T01:02:03.004Z'));
     assert.equal(path, '/tmp/logwork-helper-home-test/diagnostics/logwork-diagnostics-2026-06-09T01-02-03-004Z.txt');
-  } finally {
-    if (previousHome === undefined) {
-      delete process.env.LOGWORK_HELPER_HOME;
-    } else {
-      process.env.LOGWORK_HELPER_HOME = previousHome;
-    }
-  }
+  });
 });

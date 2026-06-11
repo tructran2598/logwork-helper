@@ -12,6 +12,7 @@ import {
 test('apiFetch retries idempotent read failures and returns successful response', async () => {
   let calls = 0;
   const data = await apiFetch('token', '/retry-read', {
+    retries: 1,
     retryDelayMs: 0,
     fetchImpl: async () => {
       calls += 1;
@@ -315,6 +316,33 @@ test('normalizeTimesheetRange reports dropped rows and malformed hour diagnostic
   assert.deepEqual(diagnostics.droppedRows.map((row) => row.reason).sort(), [
     'missing_date',
     'missing_project_identity'
+  ]);
+});
+
+test('normalizeTimesheetRange scans fallback hour fields after invalid values', () => {
+  const records = normalizeTimesheetRange({
+    data: [
+      {
+        date: '2026-06-01',
+        project_member_id: 1111,
+        project_name: 'Fallback Hours',
+        assign_hours: 'not-a-number',
+        assigned_hours: 6,
+        logged_hours: 'also-bad',
+        logtimes: 2
+      }
+    ]
+  }, {
+    from: '2026-06-01',
+    to: '2026-06-02'
+  });
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].bookedHours, 6);
+  assert.equal(records[0].loggedHours, 2);
+  assert.deepEqual(getNormalizationDiagnostics(records).warnings.map((warning) => warning.field), [
+    'assign_hours',
+    'logged_hours'
   ]);
 });
 

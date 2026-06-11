@@ -136,13 +136,28 @@ function hostFromUrl(value, label) {
 }
 
 function validateUrl(value, label) {
+  let url;
   try {
-    const url = new URL(value);
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new Error('unsupported protocol');
-    }
-    return url;
+    url = new URL(value);
   } catch {
     throw new Error(`${label} must be a valid http(s) URL.`);
   }
+
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error(`${label} must be a valid http(s) URL.`);
+  }
+
+  if (url.protocol === 'http:' && !isLocalHttpHost(url.hostname)) {
+    throw new Error(`${label} must use HTTPS unless it points to localhost or loopback.`);
+  }
+
+  return url;
+}
+
+function isLocalHttpHost(hostname) {
+  const host = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
+  return host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host.startsWith('127.');
 }

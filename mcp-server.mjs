@@ -48,11 +48,15 @@ server.registerTool('apply_logwork_batch', {
     batch: z.any().optional().describe('Backward-compatible structured preview echo. When provided, it must match the cached preview for batchId.'),
     confirm: z.boolean().describe('Must be true after explicit user approval.'),
     allowUnbooked: z.boolean().optional().describe('Allow submitting entries resolved to a valid project membership without a booking for that date.'),
-    projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Final map from preview entry id to projectMemberId.')
+    projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Deprecated for apply. Project overrides must be included during preview so approval covers the final project selection.')
   }
 }, withAuthRequiredHandling(async ({ batchId, batch, confirm, allowUnbooked = false, projectOverrides = {} }) => {
   prunePreviewCache(previews);
-  const approvedBatch = resolveApprovedBatch({
+  assertNoFinalProjectOverrides(projectOverrides);
+  if (confirm !== true) {
+    throw new Error('apply_logwork_batch requires confirm: true.');
+  }
+  const approvedBatch = consumeApprovedBatch({
     cache: previews,
     batchId,
     batch
@@ -61,12 +65,8 @@ server.registerTool('apply_logwork_batch', {
   const result = await applyLogworkBatch({
     batch: approvedBatch,
     confirm,
-    allowUnbooked,
-    projectOverrides
+    allowUnbooked
   });
-  if (batchId) {
-    previews.delete(batchId);
-  }
   return formatToolResponse(result);
 }));
 
@@ -212,6 +212,30 @@ export function resolveApprovedBatch({
   }
 
   return clonePreview(cached.preview);
+}
+
+export function consumeApprovedBatch({
+  cache,
+  batchId,
+  batch,
+  now = Date.now()
+}) {
+  const approvedBatch = resolveApprovedBatch({
+    cache,
+    batchId,
+    batch,
+    now
+  });
+  cache.delete(batchId);
+  return approvedBatch;
+}
+
+export function assertNoFinalProjectOverrides(projectOverrides = {}) {
+  if (!projectOverrides || typeof projectOverrides !== 'object' || !Object.keys(projectOverrides).length) {
+    return;
+  }
+
+  throw new Error('apply_logwork_batch no longer accepts final projectOverrides. Re-run preview_logwork_batch with projectOverrides so the approved batchId covers the final project selection.');
 }
 
 export function createPreviewFingerprint(preview = {}) {
