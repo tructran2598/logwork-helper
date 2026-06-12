@@ -1,6 +1,6 @@
 {
   "name": "logwork-helper",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Local-first MCP server and terminal CLI for safe Resource Optimiser logwork automation.",
   "license": "UNLICENSED",
   "type": "module",
