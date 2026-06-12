@@ -7,6 +7,7 @@ import {
 } from './lib/auth.mjs';
 import { authenticateWithApiSession } from './lib/api-auth.mjs';
 import { createAuthDiagnosticsRecorder } from './lib/auth-diagnostics.mjs';
+import { credentialStoreLabel } from './lib/credential-store.mjs';
 import { isMainModule } from './lib/entrypoint.mjs';
 
 async function main() {
@@ -82,15 +83,16 @@ export async function runLoginCommand({
 }
 
 function printHelp() {
+  const storeLabel = credentialStoreLabel();
   console.log(`Usage:
   logwork-helper auth login
   logwork-helper auth status
   logwork-helper auth logout
 
 Commands:
-  login   Authenticate Resource Optimiser through Keycloak APIs and save token to macOS Keychain
+  login   Authenticate Resource Optimiser through Keycloak APIs and save token to ${storeLabel}
   status  Show stored auth status without printing token
-  logout  Delete stored Resource Optimiser token from macOS Keychain
+  logout  Delete stored Resource Optimiser token from ${storeLabel}
 `);
 }
 

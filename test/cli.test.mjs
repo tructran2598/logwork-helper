@@ -10,6 +10,7 @@ import { createAuthDiagnosticsRecorder } from '../lib/auth-diagnostics.mjs';
 import {
   formatSetupUserInstructions,
   formatTerminalCommandInstructions,
+  findCommandOnPath,
   installUserRuntime,
   linkGlobalBinaries,
   parseSetupUserArgs,
@@ -24,7 +25,9 @@ test('package exposes logwork binary for manual REPL shortcut', () => {
   assert.equal(packageJson.bin['logwork-helper-manual'], 'manual-log.mjs');
 });
 
-test('entrypoint detection supports direct paths, symlinks, and unrelated paths', () => {
+test('entrypoint detection supports direct paths, symlinks, and unrelated paths', {
+  skip: process.platform === 'win32' ? 'Windows npm bins use command shims instead of POSIX symlinks.' : false
+}, () => {
   const manualPath = new URL('../manual-log.mjs', import.meta.url).pathname;
   const manualUrl = pathToFileURL(realpathSync(manualPath)).href;
   const tmpDir = mkdtempSync(join(tmpdir(), 'logwork-entrypoint-'));
@@ -36,7 +39,9 @@ test('entrypoint detection supports direct paths, symlinks, and unrelated paths'
   assert.equal(isMainModule(manualUrl, ['node', new URL('../package.json', import.meta.url).pathname]), false);
 });
 
-test('manual binary starts through a symlink like an npm global bin', () => {
+test('manual binary starts through a symlink like an npm global bin', {
+  skip: process.platform === 'win32' ? 'Windows npm bins use command shims instead of POSIX symlinks.' : false
+}, () => {
   const manualPath = new URL('../manual-log.mjs', import.meta.url).pathname;
   const tmpDir = mkdtempSync(join(tmpdir(), 'logwork-bin-'));
   const symlinkPath = join(tmpDir, 'logwork');
@@ -386,6 +391,26 @@ test('global binary link warns when logwork is not visible on PATH', async () =>
   assert.match(result.warning, /not visible on PATH/);
 });
 
+test('PATH command finder supports Windows npm shims', async () => {
+  const checked = [];
+  const result = await findCommandOnPath('logwork', {
+    platform: 'win32',
+    envPath: 'C:\\Tools;C:\\Users\\example\\AppData\\Roaming\\npm',
+    accessFn: async (path) => {
+      checked.push(path);
+      if (path.endsWith('logwork.cmd')) {
+        return;
+      }
+      const error = new Error('missing');
+      error.code = 'ENOENT';
+      throw error;
+    }
+  });
+
+  assert.equal(result, true);
+  assert.equal(checked.some((path) => path.endsWith('logwork.cmd')), true);
+});
+
 test('setup-user output explains terminal commands and fallback install', () => {
   assert.match(formatTerminalCommandInstructions({
     linked: true,
@@ -428,7 +453,28 @@ test('setup-user checklist omits auth retry after successful login', () => {
   assert.match(output, /Cursor \/ Antigravity mcp_config\.json:/);
   assert.match(output, /Codex config\.toml:/);
   assert.match(output, /GitHub Copilot \/ VS Code mcp\.json:/);
-  assert.match(output, /\/tmp\/target-logwork-helper\/mcp-server\.mjs/);
+  assert.match(output, /target-logwork-helper/);
+  assert.match(output, /mcp-server\.mjs/);
+});
+
+test('setup-user checklist uses Windows credential store and hook command on Windows', () => {
+  const output = formatSetupUserInstructions({
+    targetDir: 'C:\\Users\\example\\.logwork-helper',
+    platform: 'win32',
+    authResult: null,
+    linkResult: {
+      linked: true,
+      commandAvailable: true
+    },
+    cleanupResult: {
+      changed: false,
+      changes: []
+    }
+  });
+
+  assert.match(output, /Windows Credential Manager/);
+  assert.match(output, /logwork-helper install-hook C:\\path\\to\\project-repo/);
+  assert.doesNotMatch(output, /setup\.sh/);
 });
 
 test('setup-user checklist gives auth retry only when auth is skipped or fails', () => {

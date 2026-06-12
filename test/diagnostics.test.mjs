@@ -139,9 +139,9 @@ test('generateDiagnosticsReport can include mapping details with explicit opt-in
 });
 
 test('diagnosticsReportPath writes inside helper diagnostics directory', () => {
-  const dir = '/tmp/logwork-helper-home-test';
+  const dir = join(tmpdir(), 'logwork-helper-home-test');
   return withEnv({ LOGWORK_HELPER_HOME: dir }, async () => {
     const path = diagnosticsReportPath(new Date('2026-06-09T01:02:03.004Z'));
-    assert.equal(path, '/tmp/logwork-helper-home-test/diagnostics/logwork-diagnostics-2026-06-09T01-02-03-004Z.txt');
+    assert.equal(path, join(dir, 'diagnostics', 'logwork-diagnostics-2026-06-09T01-02-03-004Z.txt'));
   });
 });

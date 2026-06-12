@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { delimiter, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { redactText } from './lib/auth-redaction.mjs';
+import { credentialStoreLabel } from './lib/credential-store.mjs';
 import { isMainModule } from './lib/entrypoint.mjs';
 import { helperHome } from './lib/paths.mjs';
 
@@ -213,15 +214,24 @@ export async function linkGlobalBinaries(targetDir, {
   };
 }
 
-async function findCommandOnPath(commandName) {
-  const pathEntries = (process.env.PATH || '').split(delimiter).filter(Boolean);
+export async function findCommandOnPath(commandName, {
+  platform = process.platform,
+  envPath = process.env.PATH || '',
+  accessFn = fs.access
+} = {}) {
+  const pathEntries = envPath.split(platform === 'win32' ? ';' : delimiter).filter(Boolean);
+  const names = platform === 'win32'
+    ? [commandName, `${commandName}.cmd`, `${commandName}.exe`, `${commandName}.bat`]
+    : [commandName];
   for (const pathEntry of pathEntries) {
-    const candidate = resolve(pathEntry, commandName);
-    try {
-      await fs.access(candidate, fsConstants.X_OK);
-      return true;
-    } catch {
-      // Keep searching PATH.
+    for (const name of names) {
+      const candidate = resolve(pathEntry, name);
+      try {
+        await accessFn(candidate, fsConstants.X_OK);
+        return true;
+      } catch {
+        // Keep searching PATH.
+      }
     }
   }
 
@@ -327,9 +337,11 @@ export function formatSetupUserInstructions({
   targetDir,
   authResult = null,
   linkResult = null,
-  cleanupResult = null
+  cleanupResult = null,
+  platform = process.platform
 } = {}) {
   const serverPath = resolve(targetDir, 'mcp-server.mjs');
+  const storeLabel = credentialStoreLabel({ platform });
   const sections = [
     `Logwork Helper installed to ${targetDir}.`,
     '',
@@ -379,14 +391,21 @@ export function formatSetupUserInstructions({
     '',
     'Safety',
     '- Do not paste passwords, 2FA codes, Bearer tokens, cookies, or raw curl auth logs into AI chat.',
-    '- MCP config only needs command and args; tokens stay in macOS Keychain.',
+    `- MCP config only needs command and args; tokens stay in ${storeLabel}.`,
     '- Project mappings are stored separately and never store Resource Optimiser tokens.',
     '',
     'Optional Git hook install:',
-    `  ${resolve(targetDir, 'setup.sh')} /path/to/project-repo`
+    `  ${formatGitHookInstallCommand(targetDir, platform)}`
   ];
 
   return sections.join('\n');
+}
+
+function formatGitHookInstallCommand(targetDir, platform) {
+  if (platform === 'win32') {
+    return 'logwork-helper install-hook C:\\path\\to\\project-repo';
+  }
+  return `${resolve(targetDir, 'setup.sh')} /path/to/project-repo`;
 }
 
 function formatAuthStatus(authResult) {

@@ -15,6 +15,8 @@ LOGWORK_KEYCLOAK_TOKEN_URL=https://keycloak.vinova.sg/auth/realms/resource/proto
 LOGWORK_KEYCLOAK_REDIRECT_URI=https://app.resourceoptimiser.com/vinova/check-login
 ```
 
+In Windows PowerShell, set the same values with `$env:NAME = "value"` before running Logwork Helper.
+
 Supported overrides:
 
 ```text
@@ -151,17 +153,17 @@ While the `task >` prompt is active, type `/` to see task-only actions:
 /cancel      Discard this logwork session
 ```
 
-Drafts saved with `/save` are stored locally at `~/.logwork-helper/manual-drafts.json` and never contain tokens, passwords, or OTPs.
+Drafts saved with `/save` are stored locally at `~/.logwork-helper/manual-drafts.json` on macOS or `%USERPROFILE%\.logwork-helper\manual-drafts.json` on Windows. Drafts never contain tokens, passwords, or OTPs.
 
 ## Troubleshooting
 
-- **IDE does not show tools**: restart or reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs`.
+- **IDE does not show tools**: restart or reload the MCP client and check the server path points to `~/.logwork-helper/mcp-server.mjs` on macOS or `%USERPROFILE%\.logwork-helper\mcp-server.mjs` on Windows.
 - **`logwork: command not found` after `setup-user`**: open a new terminal first. If it still fails, run `npm install -g logwork-helper` or ensure your npm global bin directory is on `PATH`.
 - **`npm error ELINKGLOBAL` during `setup-user`**: update to `logwork-helper@0.1.6` or newer, then rerun setup. The installer uses `npm link`, not `npm link --global`.
 - **`query_logwork` or `allowUnbooked` missing**: reload the MCP tool cache or restart the IDE.
 - **Not authenticated**: run `logwork-helper auth login`, or ask the assistant to call `start_auth_login`; enter secrets only in Terminal.
 - **Auth error after 2FA**: retry `logwork-helper auth login`. If it still fails, run `logwork-helper diagnostics` and send only the generated sanitized report.
-- **Support needs logs**: run `logwork-helper doctor` or `logwork-helper diagnostics`; the report is saved under `~/.logwork-helper/diagnostics`.
+- **Support needs logs**: run `logwork-helper doctor` or `logwork-helper diagnostics`; the report is saved under the helper diagnostics directory.
 - **No project matched**: ask the assistant to call `list_logwork_projects`, choose the correct project, then call `upsert_project_mapping`.
 - **Do not paste Bearer tokens, cookies, passwords, OTPs, or raw curl auth logs**: auth is handled locally and MCP config should only contain `command` and `args`.
 
@@ -181,10 +183,22 @@ Optional Git hook install:
 ~/.logwork-helper/setup.sh /path/to/repo-that-you-commit-in
 ```
 
+On Windows, use:
+
+```powershell
+logwork-helper install-hook C:\path\to\repo-that-you-commit-in
+```
+
 Dry run:
 
 ```bash
 LOGWORK_DRY_RUN=1 logwork-helper manual quick --message "Dry run task"
+```
+
+In Windows PowerShell:
+
+```powershell
+$env:LOGWORK_DRY_RUN = "1"; logwork-helper manual quick --message "Dry run task"
 ```
 
 ## Release Checks
@@ -213,6 +227,7 @@ logwork
 mcp-server
 nodejs
 macos
+windows
 keycloak
 codex
 cursor

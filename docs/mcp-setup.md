@@ -1,6 +1,6 @@
 # MCP Setup
 
-Use `/mcp` inside the `logwork` terminal UI when possible. It prints copy-ready config with your actual `~/.logwork-helper/mcp-server.mjs` path.
+Use `/mcp` inside the `logwork` terminal UI when possible. It prints copy-ready config with your actual `mcp-server.mjs` path.
 
 ```bash
 logwork
@@ -10,7 +10,7 @@ logwork
 /mcp
 ```
 
-The examples below use `/Users/<user>` as a placeholder. Replace it with the path printed by `logwork-helper setup-user --no-login` or `/mcp`.
+The examples below use `/Users/<user>` as a macOS placeholder. On Windows, use the path printed by setup or `/mcp`, usually `C:\\Users\\<user>\\.logwork-helper\\mcp-server.mjs` inside JSON/TOML strings.
 
 ## Cursor
 
@@ -78,6 +78,12 @@ Add the server from Terminal:
 claude mcp add --transport stdio logwork-helper -- node "/Users/<user>/.logwork-helper/mcp-server.mjs"
 ```
 
+From Windows PowerShell:
+
+```powershell
+claude mcp add --transport stdio logwork-helper -- node 'C:\Users\<user>\.logwork-helper\mcp-server.mjs'
+```
+
 Or add this to project `.mcp.json`:
 
 ```json
@@ -107,6 +113,8 @@ If an MCP tool says auth is required, ask your assistant to call `start_auth_log
 ```bash
 logwork-helper auth login
 ```
+
+On Windows, run the same command from PowerShell.
 
 Do not paste passwords, 2FA codes, Bearer tokens, cookies, or raw auth logs into AI chat.
 

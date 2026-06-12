@@ -19,13 +19,14 @@ test('atomicWriteFile writes through a unique temporary file and leaves no temp 
 });
 
 test('atomicWriteFile removes temp file and preserves existing target when rename fails', async () => {
+  const target = join('tmp', 'state.json');
   const files = new Map([
-    ['/tmp/state.json', 'old']
+    [target, 'old']
   ]);
   let tempPath;
 
   await assert.rejects(
-    () => atomicWriteFile('/tmp/state.json', 'new', {
+    () => atomicWriteFile(target, 'new', {
       mkdirFn: async () => {},
       writeFileFn: async (path, content) => {
         tempPath = path;
@@ -43,6 +44,6 @@ test('atomicWriteFile removes temp file and preserves existing target when renam
     /rename failed/
   );
 
-  assert.equal(files.get('/tmp/state.json'), 'old');
+  assert.equal(files.get(target), 'old');
   assert.equal(files.has(tempPath), false);
 });

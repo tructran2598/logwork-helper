@@ -2,7 +2,7 @@
   "name": "logwork-helper",
   "version": "0.1.8",
   "description": "Local-first MCP server and terminal CLI for safe Resource Optimiser logwork automation.",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "type": "module",
   "homepage": "https://github.com/tructran2598/logwork-helper#readme",
   "bugs": {
@@ -19,6 +19,7 @@
     "ai-assistant",
     "nodejs",
     "macos",
+    "windows",
     "keycloak",
     "codex",
     "cursor",
@@ -29,6 +30,10 @@
   "engines": {
     "node": ">=20"
   },
+  "os": [
+    "darwin",
+    "win32"
+  ],
   "files": [
     "auth-cli.mjs",
     "cli.mjs",

@@ -18,7 +18,7 @@ What happens:
 4. You enter the 2FA code in Terminal.
 5. The helper exchanges the Keycloak authorization code.
 6. The helper calls Resource Optimiser `signinKeyCloak`.
-7. The helper stores the Resource Optimiser access/refresh token session in macOS Keychain.
+7. The helper stores the Resource Optimiser access/refresh token session in the OS credential store.
 
 Check auth status without printing the token:
 
@@ -38,7 +38,7 @@ logwork-helper auth logout
 - Password and 2FA are never stored.
 - Keycloak URLs contain dynamic `state`, `nonce`, `execution`, and `tab_id` values. Do not hardcode or paste them into config.
 - Keycloak access tokens are intermediate only and are not stored.
-- Only the final Resource Optimiser access/refresh token session is stored in macOS Keychain.
+- Only the final Resource Optimiser access/refresh token session is stored in the OS credential store: macOS Keychain on macOS, or Windows Credential Manager on Windows.
 - Auth does not open or read any browser profile.
 
 ## Auth Security Flow
@@ -50,8 +50,8 @@ flowchart TD
   C --> D["Helper exchanges Keycloak authorization code"]
   D --> E["Helper calls Resource Optimiser signinKeyCloak"]
   E --> F["Helper validates JWT expiry and user id"]
-  F --> G["Final RO access/refresh session saved to macOS Keychain"]
-  G --> H["MCP tools call Resource Optimiser APIs with the local Keychain session"]
+  F --> G["Final RO access/refresh session saved to OS credential store"]
+  G --> H["MCP tools call Resource Optimiser APIs with the local credential session"]
 
   I["MCP config"] -. "no token" .-> H
   J[".logwork-helper.json"] -. "project mapping only" .-> H
@@ -64,6 +64,12 @@ Installed runtime:
 
 ```text
 ~/.logwork-helper
+```
+
+On Windows this is under:
+
+```text
+%USERPROFILE%\.logwork-helper
 ```
 
 Project mapping config:
@@ -88,7 +94,7 @@ Diagnostics reports:
 
 - Token is not stored in MCP config.
 - Token is not stored in `.logwork-helper.json`.
-- Email may be remembered in macOS Keychain to prefill the next login.
+- Email may be remembered in the OS credential store to prefill the next login.
 - MCP writes logwork only after an assistant calls `apply_logwork_batch` with explicit confirmation and a cached preview `batchId`.
 - `query_logwork` and `list_logwork_projects` are read-only.
 - Diagnostics reports redact tokens, cookies, passwords, OTPs, auth codes, and raw HTML.

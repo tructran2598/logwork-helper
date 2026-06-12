@@ -2,10 +2,10 @@
 
 ## Project Structure & Module Organization
 
-This is a private Node.js 20+ ESM project for a macOS Git `commit-msg` hook, interactive CLI, and local MCP server that log work to Resource Optimiser.
+This is a private Node.js 20+ ESM project for a macOS/Windows Git `commit-msg` hook, interactive CLI, and local MCP server that log work to Resource Optimiser.
 
 - `logwork-helper.mjs`, `manual-log.mjs`, `mcp-server.mjs`, and `install.mjs` are executable entry points.
-- `lib/` contains reusable modules for API access, auth, project resolution, parsing, workflows, UI, and macOS integration.
+- `lib/` contains reusable modules for API access, auth, project resolution, parsing, workflows, UI, and OS integration.
 - `test/` contains Node test runner suites named `*.test.mjs`.
 - `hooks/` contains the Git hook template installed into target repositories.
 - `examples/mcp/` contains MCP client configuration templates.
@@ -53,4 +53,4 @@ Never publish with a dirty worktree. Never run `npm version` again after the ver
 
 ## Security & Configuration Tips
 
-Do not commit Resource Optimiser tokens, `.env` files, or machine-specific MCP paths. Auth is read from Safari `localStorage`; keep MCP `cwd` pointed at this repository so optional `.logwork-helper.json` project mappings resolve predictably.
+Do not commit Resource Optimiser tokens, `.env` files, or machine-specific MCP paths. Auth stores only the final Resource Optimiser session in the OS credential store; keep MCP `cwd` pointed at this repository so optional `.logwork-helper.json` project mappings resolve predictably.

@@ -14,7 +14,7 @@ const COMMANDS = new Map([
     help: `Usage:
   logwork-helper setup-user [--login|--no-login]
 
-Installs the runtime into ~/.logwork-helper, links terminal commands, prints MCP configs, and shows the next verification steps.
+Installs the local helper runtime, links terminal commands, prints MCP configs, and shows the next verification steps.
 
 Options:
   --login     Run Resource Optimiser auth login after installing
@@ -50,7 +50,7 @@ Authentication uses the Resource Optimiser / Keycloak API flow and does not open
     help: `Usage:
   logwork-helper diagnostics
 
-Writes a sanitized support report under ~/.logwork-helper/diagnostics.
+Writes a sanitized support report under the local helper diagnostics directory.
 Send only the generated file to developers; do not send raw curl logs, cookies, passwords, OTPs, or tokens.`
   }],
   ['doctor', {
@@ -59,7 +59,7 @@ Send only the generated file to developers; do not send raw curl logs, cookies, 
     help: `Usage:
   logwork-helper doctor
 
-Runs the same checks as diagnostics and writes a sanitized support report under ~/.logwork-helper/diagnostics.
+Runs the same checks as diagnostics and writes a sanitized support report under the local helper diagnostics directory.
 Send only the generated file to developers; do not send raw curl logs, cookies, passwords, OTPs, or tokens.`
   }],
   ['manual', {

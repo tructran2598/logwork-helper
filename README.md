@@ -14,7 +14,7 @@ Credentials stay local. Passwords and 2FA codes are entered in Terminal only, ne
 
 Requirements:
 
-- macOS
+- macOS or Windows 10/11
 - Node.js 20+
 - npm
 
@@ -30,7 +30,7 @@ Prepare the local runtime used by MCP configs:
 logwork-helper setup-user
 ```
 
-This creates `~/.logwork-helper`, installs runtime dependencies there, links the terminal commands, and prints copy-ready MCP config snippets using your real local path.
+This creates the local Logwork Helper runtime (`~/.logwork-helper` on macOS, `%USERPROFILE%\.logwork-helper` on Windows), installs runtime dependencies there, links the terminal commands, and prints copy-ready MCP config snippets using your real local path.
 
 ## Authenticate
 
@@ -40,7 +40,7 @@ Log in to Resource Optimiser from Terminal:
 logwork-helper auth login
 ```
 
-Follow the prompts for email, password, 2FA device, and 2FA code. The helper stores only the final Resource Optimiser session in macOS Keychain.
+Follow the prompts for email, password, 2FA device, and 2FA code. The helper stores only the final Resource Optimiser session in your OS credential store: macOS Keychain on macOS, or Windows Credential Manager on Windows.
 
 Check auth status:
 
@@ -130,7 +130,7 @@ Useful terminal commands:
 ## More Docs
 
 - [MCP setup](docs/mcp-setup.md): full client configs, exposed tools, verification prompts, and common MCP workflows.
-- [Security and auth](docs/security.md): Keycloak flow, macOS Keychain storage, stored files, and safety model.
+- [Security and auth](docs/security.md): Keycloak flow, OS credential storage, stored files, and safety model.
 - [Advanced usage](docs/advanced.md): environment overrides, manual REPL details, updates, troubleshooting, legacy git hook, and release checks.
 - [Release checklist](RELEASE.md): publish and manual verification checklist.
 

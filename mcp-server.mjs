@@ -123,7 +123,7 @@ server.registerTool('upsert_project_mapping', {
 }));
 
 server.registerTool('start_auth_login', {
-  description: 'Open a macOS Terminal Resource Optimiser auth login session. No credentials are accepted by this MCP tool.',
+  description: 'Start or explain a local Resource Optimiser auth login session. No credentials are accepted by this MCP tool.',
   inputSchema: {}
 }, async () => {
   const result = await startAuthLoginTerminal();

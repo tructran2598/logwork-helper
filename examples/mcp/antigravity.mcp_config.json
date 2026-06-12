@@ -2,7 +2,7 @@
   "mcpServers": {
     "logwork-helper": {
       "command": "node",
-      "args": ["/Users/<user>/.logwork-helper/mcp-server.mjs"]
+      "args": ["<path-to-mcp-server.mjs>"]
     }
   }
 }
