@@ -5,6 +5,7 @@ const BASE_CONFIG = {
   apiBase: 'https://api.resourceoptimiser.com/api/v1',
   loginUrl: 'https://app.resourceoptimiser.com/vinova',
   tokenKey: 'vinova_access_token',
+  jiraBaseUrl: 'https://jira-vnv.vinova.sg',
 
   projectMembersPath: '/project-members/by-user',
   memberLogtimePath: '/member-logtime',
@@ -51,6 +52,7 @@ export function buildConfig(env = {}) {
     apiBase: readUrlEnv(env, 'LOGWORK_API_BASE') || BASE_CONFIG.apiBase,
     loginUrl: readUrlEnv(env, 'LOGWORK_LOGIN_URL') || BASE_CONFIG.loginUrl,
     tokenKey: readStringEnv(env, 'LOGWORK_TOKEN_KEY') || BASE_CONFIG.tokenKey,
+    jiraBaseUrl: readUrlEnv(env, 'LOGWORK_JIRA_BASE_URL') || BASE_CONFIG.jiraBaseUrl,
     keycloakAuthUrl: readUrlEnv(env, 'LOGWORK_KEYCLOAK_AUTH_URL') || BASE_CONFIG.keycloakAuthUrl,
     keycloakTokenUrl: readUrlEnv(env, 'LOGWORK_KEYCLOAK_TOKEN_URL') || BASE_CONFIG.keycloakTokenUrl,
     keycloakClientId: readStringEnv(env, 'LOGWORK_KEYCLOAK_CLIENT_ID') || BASE_CONFIG.keycloakClientId,

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseLoginArgs, runLoginCommand } from '../auth-cli.mjs';
+import { parseJiraLoginArgs, runJiraLoginCommand } from '../jira-cli.mjs';
 import { createAuthDiagnosticsRecorder } from '../lib/auth-diagnostics.mjs';
 import {
   formatSetupUserInstructions,
@@ -59,7 +60,7 @@ test('manual binary starts through a symlink like an npm global bin', {
   });
   assert.equal(repl.status, 0);
   assert.match(repl.stdout, /Logwork Helper manual session/);
-  assert.match(repl.stdout, /\/logwork\s+Create logwork with date\/project\/task wizard/);
+  assert.match(repl.stdout, /\/logwork \[ro\|jira\|both\]\s+Create Resource Optimiser, Jira, or combined logwork/);
 });
 
 test('CLI dispatcher prints top-level help', () => {
@@ -70,6 +71,7 @@ test('CLI dispatcher prints top-level help', () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /logwork-helper setup-user/);
   assert.match(result.stdout, /logwork-helper auth login/);
+  assert.match(result.stdout, /logwork-helper jira login/);
   assert.match(result.stdout, /logwork-helper doctor/);
   assert.match(result.stdout, /logwork-helper mcp/);
   assert.match(result.stdout, /\n  logwork\n/);
@@ -100,6 +102,17 @@ test('CLI dispatcher prints API-only auth help', () => {
   assert.match(result.stdout, /Keycloak API flow/);
   assert.doesNotMatch(result.stdout, /--browser/);
   assert.doesNotMatch(result.stdout, /auth record/);
+});
+
+test('CLI dispatcher prints Jira auth help', () => {
+  const result = spawnSync(process.execPath, ['cli.mjs', 'jira', '--help'], {
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /logwork-helper jira login/);
+  assert.match(result.stdout, /Personal Access Token/);
+  assert.match(result.stdout, /never accept Jira tokens/);
 });
 
 test('CLI dispatcher prints diagnostics help', () => {
@@ -168,8 +181,15 @@ test('CLI dispatcher prints manual REPL help', () => {
   assert.match(result.stdout, /Preferred shortcut:\n  logwork/);
   assert.match(result.stdout, /logwork-helper manual/);
   assert.match(result.stdout, /manual quick --message/);
+  assert.match(result.stdout, /\/query yesterday/);
   assert.match(result.stdout, /\/query this-week/);
+  assert.match(result.stdout, /\/query last-week/);
+  assert.match(result.stdout, /\/query this-month/);
+  assert.match(result.stdout, /\/query last-month/);
   assert.match(result.stdout, /\/logwork/);
+  assert.match(result.stdout, /\/logwork ro/);
+  assert.match(result.stdout, /\/logwork jira/);
+  assert.match(result.stdout, /\/logwork both/);
   assert.doesNotMatch(result.stdout, /\/apply/);
   assert.doesNotMatch(result.stdout, /\/exit/);
 });
@@ -239,6 +259,51 @@ test('auth login command writes sanitized diagnostics only on failure', async ()
 
   assert.equal(success.ok, true);
   assert.equal(existsSync(successLogPath), false);
+});
+
+test('Jira login parser supports base URL override only', () => {
+  assert.deepEqual(parseJiraLoginArgs([]), {});
+  assert.deepEqual(parseJiraLoginArgs(['--base-url', 'https://jira.example.com/jira']), {
+    baseUrl: 'https://jira.example.com/jira'
+  });
+  assert.deepEqual(parseJiraLoginArgs(['--base-url=https://jira.example.com']), {
+    baseUrl: 'https://jira.example.com'
+  });
+  assert.throws(() => parseJiraLoginArgs(['--base-url']), /requires a value/);
+  assert.throws(() => parseJiraLoginArgs(['--token', 'secret']), /Unknown jira login option/);
+});
+
+test('Jira login command validates via injected auth and redacts failures', async () => {
+  const stdout = [];
+  const stderr = [];
+  const success = await runJiraLoginCommand({
+    baseUrl: 'https://jira.example.com',
+    login: async ({ baseUrl }) => {
+      assert.equal(baseUrl, 'https://jira.example.com');
+      return {
+        summary: 'Authenticated to Jira https://jira.example.com as Jira User.'
+      };
+    },
+    stdout: (message) => stdout.push(message),
+    stderr: (message) => stderr.push(message)
+  });
+
+  assert.equal(success.ok, true);
+  assert.match(stdout.join('\n'), /Starting Jira PAT auth/);
+  assert.match(stdout.join('\n'), /Authenticated to Jira/);
+  assert.deepEqual(stderr, []);
+
+  const failure = await runJiraLoginCommand({
+    login: async () => {
+      throw new Error('Jira rejected token=jira-pat-secret');
+    },
+    stdout: () => {},
+    stderr: (message) => stderr.push(message)
+  });
+
+  assert.equal(failure.ok, false);
+  assert.match(stderr.join('\n'), /token=<redacted>/);
+  assert.doesNotMatch(stderr.join('\n'), /jira-pat-secret/);
 });
 
 test('setup-user parser supports login flags', () => {

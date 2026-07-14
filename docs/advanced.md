@@ -10,6 +10,7 @@ Defaults target the current Resource Optimiser / Vinova profile. For non-default
 LOGWORK_HELPER_PROFILE=vinova
 LOGWORK_API_BASE=https://api.resourceoptimiser.com/api/v1
 LOGWORK_LOGIN_URL=https://app.resourceoptimiser.com/vinova
+LOGWORK_JIRA_BASE_URL=https://jira-vnv.vinova.sg
 LOGWORK_KEYCLOAK_AUTH_URL=https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/auth
 LOGWORK_KEYCLOAK_TOKEN_URL=https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/token
 LOGWORK_KEYCLOAK_REDIRECT_URI=https://app.resourceoptimiser.com/vinova/check-login
@@ -23,6 +24,7 @@ Supported overrides:
 LOGWORK_HELPER_PROFILE
 LOGWORK_API_BASE
 LOGWORK_LOGIN_URL
+LOGWORK_JIRA_BASE_URL
 LOGWORK_TOKEN_KEY
 LOGWORK_ALLOWED_SAFARI_HOSTS
 LOGWORK_KEYCLOAK_AUTH_URL
@@ -110,11 +112,11 @@ cwd: /path/to/repo
 
 logwork > /
 > /help        Show this help
-  /auth        Run Resource Optimiser auth
-  /status      Show stored auth status
+  /auth        Authenticate Resource Optimiser or show Jira login command
+  /status      Show Resource Optimiser and Jira auth status
   /diagnostics Write a sanitized report
-  /query       Query logwork by day or range
-  /logwork     Create logwork wizard
+  /query       Query logwork by preset period
+  /logwork     Create Resource Optimiser, Jira, or combined logwork
   /mcp         Show copy-ready MCP setup
 ```
 
@@ -122,8 +124,15 @@ Useful commands inside the session:
 
 ```text
 /query today
+/query yesterday
 /query this-week
+/query last-week
+/query this-month
+/query last-month
 /logwork
+/logwork ro
+/logwork jira
+/logwork both
 /mcp
 /projects
 /projects 5234
@@ -131,12 +140,21 @@ Useful commands inside the session:
 /diagnostics
 ```
 
-`/logwork` opens a guided flow: pick a day in the current week, pick a Resource Optimiser project, then enter one task per line:
+`/logwork` opens a target picker for Resource Optimiser, Jira, or Both. `/logwork ro` starts the Resource Optimiser wizard: pick a day in the current week, pick a Resource Optimiser project, then enter one task per line:
 
 ```text
 +2 check ui/ux
 +1.5 polish reset password state
 ```
+
+`/logwork jira` starts the Jira worklog wizard: pick a day, then enter tasks with exactly one Jira issue key:
+
+```text
++2 check ui/ux (SCB-213)
++1.5 polish reset password state (SCB-214)
+```
+
+`/logwork both` uses one date/task draft, builds separate Resource Optimiser and Jira previews, then asks for separate approvals when applying.
 
 Inside `/logwork`, press Enter on an empty input to apply the ready preview. Use `/remove` to open a multi-select task remover, `/edit` to replace a task, `/save` to persist a local draft, or `Esc` to cancel with confirmation.
 
@@ -153,7 +171,7 @@ While the `task >` prompt is active, type `/` to see task-only actions:
 /cancel      Discard this logwork session
 ```
 
-Drafts saved with `/save` are stored locally at `~/.logwork-helper/manual-drafts.json` on macOS or `%USERPROFILE%\.logwork-helper\manual-drafts.json` on Windows. Drafts never contain tokens, passwords, or OTPs.
+Resource Optimiser drafts saved with `/save` are stored locally at `~/.logwork-helper/manual-drafts.json` on macOS or `%USERPROFILE%\.logwork-helper\manual-drafts.json` on Windows. Drafts never contain tokens, passwords, or OTPs.
 
 ## Troubleshooting
 
@@ -161,8 +179,10 @@ Drafts saved with `/save` are stored locally at `~/.logwork-helper/manual-drafts
 - **`logwork: command not found` after `setup-user`**: open a new terminal first. If it still fails, run `npm install -g logwork-helper` or ensure your npm global bin directory is on `PATH`.
 - **`npm error ELINKGLOBAL` during `setup-user`**: update to `logwork-helper@0.1.6` or newer, then rerun setup. The installer uses `npm link`, not `npm link --global`.
 - **`query_logwork` or `allowUnbooked` missing**: reload the MCP tool cache or restart the IDE.
-- **Not authenticated**: run `logwork-helper auth login`, or ask the assistant to call `start_auth_login`; enter secrets only in Terminal.
+- **Not authenticated to Resource Optimiser**: run `logwork-helper auth login`, or ask the assistant to call `start_auth_login`; enter secrets only in Terminal.
+- **Not authenticated to Jira**: run `logwork-helper jira login`, or ask the assistant to call `start_jira_auth`; paste the Jira PAT only in Terminal.
 - **Auth error after 2FA**: retry `logwork-helper auth login`. If it still fails, run `logwork-helper diagnostics` and send only the generated sanitized report.
+- **Jira worklog preview is blocked**: every Jira entry must include exactly one issue key, such as `SCB-213`. Duplicate Jira worklogs are blocking and cannot be overridden in v1.
 - **Support needs logs**: run `logwork-helper doctor` or `logwork-helper diagnostics`; the report is saved under the helper diagnostics directory.
 - **No project matched**: ask the assistant to call `list_logwork_projects`, choose the correct project, then call `upsert_project_mapping`.
 - **Do not paste Bearer tokens, cookies, passwords, OTPs, or raw curl auth logs**: auth is handled locally and MCP config should only contain `command` and `args`.

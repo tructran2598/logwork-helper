@@ -194,8 +194,15 @@ REPL commands:
   Type / for live command suggestions.
   /help
   /query today
+  /query yesterday
   /query this-week
+  /query last-week
+  /query this-month
+  /query last-month
   /logwork
+  /logwork ro
+  /logwork jira
+  /logwork both
   /mcp
   /projects
   /projects 5234

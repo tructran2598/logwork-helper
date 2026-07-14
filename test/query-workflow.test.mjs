@@ -61,6 +61,58 @@ test('normalizeQueryRange supports this_week as Monday to next Monday', (context
   });
 });
 
+test('normalizeQueryRange supports yesterday as previous local day', (context) => {
+  const OriginalDate = globalThis.Date;
+  class MockDate extends OriginalDate {
+    constructor(...args) {
+      if (args.length === 0) {
+        super('2026-06-03T10:00:00+07:00');
+        return;
+      }
+      super(...args);
+    }
+  }
+  globalThis.Date = MockDate;
+  context.after(() => {
+    globalThis.Date = OriginalDate;
+  });
+
+  assert.deepEqual(normalizeQueryRange({ period: 'yesterday' }), {
+    from: '2026-06-02',
+    to: '2026-06-03'
+  });
+});
+
+test('normalizeQueryRange supports week and month preset periods', (context) => {
+  const OriginalDate = globalThis.Date;
+  class MockDate extends OriginalDate {
+    constructor(...args) {
+      if (args.length === 0) {
+        super('2026-06-16T10:00:00+07:00');
+        return;
+      }
+      super(...args);
+    }
+  }
+  globalThis.Date = MockDate;
+  context.after(() => {
+    globalThis.Date = OriginalDate;
+  });
+
+  assert.deepEqual(normalizeQueryRange({ period: 'last_week' }), {
+    from: '2026-06-08',
+    to: '2026-06-15'
+  });
+  assert.deepEqual(normalizeQueryRange({ period: 'this_month' }), {
+    from: '2026-06-01',
+    to: '2026-07-01'
+  });
+  assert.deepEqual(normalizeQueryRange({ period: 'last_month' }), {
+    from: '2026-05-01',
+    to: '2026-06-01'
+  });
+});
+
 test('queryLogwork filters by project id/name/ticket mapping and falls back for entries', async () => {
   const fetchedDayLogs = [];
   const result = await queryLogwork({

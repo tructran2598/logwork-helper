@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createCredentialEmailStorage,
+  createCredentialJiraStorage,
   createCredentialTokenStorage,
   credentialStoreLabel
 } from '../lib/credential-store.mjs';
@@ -88,6 +89,22 @@ test('platform credential storage creates Windows token and email targets', asyn
 
   assert.equal(requests[0].target, 'logwork-helper:resourceoptimiser');
   assert.equal(requests[1].target, 'logwork-helper:resourceoptimiser-email');
+});
+
+test('platform credential storage creates separate Jira target', async () => {
+  const requests = [];
+  const jiraStorage = createCredentialJiraStorage({
+    platform: 'win32',
+    run: async (request) => {
+      requests.push(request);
+      return { ok: true };
+    }
+  });
+
+  await jiraStorage.set('jira-session');
+
+  assert.equal(requests[0].target, 'logwork-helper:jira');
+  assert.equal(requests[0].username, 'jira');
 });
 
 test('Windows credential target includes service and account', () => {

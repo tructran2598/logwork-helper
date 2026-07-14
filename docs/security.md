@@ -1,6 +1,6 @@
 # Security And Auth
 
-Logwork Helper does not accept or store Bearer tokens in config files. Login is API-only and runs in Terminal.
+Logwork Helper does not accept or store Bearer tokens in config files. Resource Optimiser login and Jira PAT login both run in Terminal.
 
 ## Auth Setup
 
@@ -41,6 +41,41 @@ logwork-helper auth logout
 - Only the final Resource Optimiser access/refresh token session is stored in the OS credential store: macOS Keychain on macOS, or Windows Credential Manager on Windows.
 - Auth does not open or read any browser profile.
 
+## Jira PAT Setup
+
+Jira self-hosted worklogs use a Jira Personal Access Token. The default Jira base URL is:
+
+```text
+https://jira-vnv.vinova.sg
+```
+
+Start Jira auth:
+
+```bash
+logwork-helper jira login
+```
+
+Use a different Jira URL only when needed:
+
+```bash
+logwork-helper jira login --base-url https://jira.example.com
+```
+
+What happens:
+
+1. You paste the Jira Personal Access Token in Terminal.
+2. The helper validates the token with `GET /rest/api/2/myself`.
+3. The helper stores `{ baseUrl, token, user }` in the OS credential store under service `logwork-helper`, account `jira`.
+
+Check or delete Jira auth without printing the token:
+
+```bash
+logwork-helper jira status
+logwork-helper jira logout
+```
+
+Jira username/password login is not supported in MCP. Do not paste Jira passwords, PATs, cookies, or raw Jira auth logs into AI chat.
+
 ## Auth Security Flow
 
 ```mermaid
@@ -52,10 +87,16 @@ flowchart TD
   E --> F["Helper validates JWT expiry and user id"]
   F --> G["Final RO access/refresh session saved to OS credential store"]
   G --> H["MCP tools call Resource Optimiser APIs with the local credential session"]
+  L["User runs logwork-helper jira login"] --> M["User pastes Jira PAT in terminal"]
+  M --> N["Helper validates GET /rest/api/2/myself"]
+  N --> O["Jira PAT session saved to OS credential store account jira"]
+  O --> P["MCP Jira tools call Jira REST APIs with the local PAT"]
 
   I["MCP config"] -. "no token" .-> H
+  I -. "no Jira PAT" .-> P
   J[".logwork-helper.json"] -. "project mapping only" .-> H
   K["AI chat / MCP args"] -. "no password or 2FA" .-> C
+  K -. "no Jira username/password/PAT" .-> M
 ```
 
 ## Stored Files
@@ -96,5 +137,8 @@ Diagnostics reports:
 - Token is not stored in `.logwork-helper.json`.
 - Email may be remembered in the OS credential store to prefill the next login.
 - MCP writes logwork only after an assistant calls `apply_logwork_batch` with explicit confirmation and a cached preview `batchId`.
+- MCP writes Jira worklogs only after an assistant calls `apply_jira_worklog_batch` with explicit confirmation and a cached Jira preview `batchId`.
+- Resource Optimiser apply and Jira worklog apply are separate flows. Applying Resource Optimiser logwork does not automatically write Jira worklogs.
+- Jira duplicate detection is blocking and has no override option in v1.
 - `query_logwork` and `list_logwork_projects` are read-only.
 - Diagnostics reports redact tokens, cookies, passwords, OTPs, auth codes, and raw HTML.

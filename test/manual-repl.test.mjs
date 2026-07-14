@@ -27,6 +27,7 @@ import {
   toggleTaskSelection
 } from '../lib/manual-logwork-wizard.mjs';
 import { createAuthRequiredError } from '../lib/auth-errors.mjs';
+import { createJiraAuthRequiredError } from '../lib/jira-auth.mjs';
 import {
   formatManualHelp,
   getCommandSuggestions,
@@ -52,6 +53,7 @@ import {
   ProjectChart,
   SlashMenu,
   StatusBar,
+  TargetPicker,
   TaskEditPicker,
   TaskRemovePicker
 } from '../lib/manual-ink-app.mjs';
@@ -75,6 +77,10 @@ const h = React.createElement;
 
 test('manual command registry renders help and slash suggestions', () => {
   assert.match(formatManualHelp(), /\/query today/);
+  assert.match(formatManualHelp(), /yesterday/);
+  assert.match(formatManualHelp(), /last-week/);
+  assert.match(formatManualHelp(), /this-month/);
+  assert.match(formatManualHelp(), /last-month/);
   assert.match(formatManualHelp(), /\/logwork/);
   assert.match(formatManualHelp(), /\/mcp \[cursor\|antigravity\|copilot\|claude-code\|codex\]/);
   assert.match(formatManualHelp(), /\/diagnostics/);
@@ -83,7 +89,24 @@ test('manual command registry renders help and slash suggestions', () => {
   assert.doesNotMatch(formatManualHelp(), /\/preview/);
   assert.match(formatManualHelp(), /\/projects \[projectMemberId\|projectId\|name\]/);
   assert.deepEqual(getCommandSuggestions('/q').map((command) => command.name), ['/query']);
+  assert.deepEqual(getCommandSuggestions('/query').map((command) => command.name), [
+    '/query today',
+    '/query yesterday',
+    '/query this-week',
+    '/query last-week',
+    '/query this-month',
+    '/query last-month'
+  ]);
+  assert.deepEqual(getCommandSuggestions('/query l').map((command) => command.name), [
+    '/query last-week',
+    '/query last-month'
+  ]);
   assert.deepEqual(getCommandSuggestions('/lo').map((command) => command.name), ['/logwork']);
+  assert.deepEqual(getCommandSuggestions('/logwork ').map((command) => command.name), [
+    '/logwork ro',
+    '/logwork jira',
+    '/logwork both'
+  ]);
   assert.deepEqual(getCommandSuggestions('/mc').map((command) => command.name), ['/mcp']);
   assert.deepEqual(getCommandSuggestions('/ap').map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/e').map((command) => command.name), []);
@@ -233,6 +256,17 @@ test('Ink manual components render shell, current panel, pickers, menu, status, 
     onSelect() {},
     onCancel() {}
   })), /Cursor/);
+  assert.match(renderToString(h(TargetPicker, {
+    title: 'Pick logwork target',
+    targets: [
+      { key: 'ro', label: 'Resource Optimiser', description: 'RO only' },
+      { key: 'jira', label: 'Jira', description: 'Jira only' }
+    ],
+    selectedIndex: 1,
+    onChange() {},
+    onSelect() {},
+    onCancel() {}
+  })), /Jira - Jira only/);
 });
 
 test('Ink manual app re-exports maintain UI and auth module compatibility', () => {
@@ -242,6 +276,7 @@ test('Ink manual app re-exports maintain UI and auth module compatibility', () =
   assert.equal(sameProjectIdentity({ projectMemberId: 5234 }, { projectMemberId: '5234' }), true);
   assert.equal(commandInputKey('command', 2), 'command:2');
   assert.equal(completeCommandValue('/lo', [{ name: '/logwork' }], 0), '/logwork');
+  assert.equal(completeCommandValue('/query l', getCommandSuggestions('/query l'), 1), '/query last-month');
   assert.equal(completeCommandValue('/logwork', [{ name: '/logwork' }], 0), null);
   assert.equal(completeCommandValue('/query today', [{ name: '/query' }], 0), null);
   assert.ok(commandItems().some((item) => item.value === '/query'));
@@ -317,24 +352,64 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
     type: 'query',
     args: { period: 'today' }
   });
+  assert.deepEqual(parseManualCommand('/query yesterday'), {
+    type: 'query',
+    args: { period: 'yesterday' }
+  });
   assert.deepEqual(parseManualCommand('/query this-week'), {
     type: 'query',
     args: { period: 'this_week' }
   });
-  assert.deepEqual(parseManualCommand('/query 2026-06-05'), {
+  assert.deepEqual(parseManualCommand('/query last-week'), {
     type: 'query',
-    args: { date: '2026-06-05' }
+    args: { period: 'last_week' }
   });
-  assert.deepEqual(parseManualCommand('/query 2026-06-01..2026-06-08'), {
+  assert.deepEqual(parseManualCommand('/query this-month'), {
     type: 'query',
-    args: {
-      from: '2026-06-01',
-      to: '2026-06-08'
-    }
+    args: { period: 'this_month' }
+  });
+  assert.deepEqual(parseManualCommand('/query last-month'), {
+    type: 'query',
+    args: { period: 'last_month' }
   });
   assert.deepEqual(parseManualCommand('/logwork'), {
     type: 'logwork',
     text: undefined
+  });
+  assert.deepEqual(parseManualCommand('/logwork ro'), {
+    type: 'logwork',
+    target: 'ro',
+    text: undefined
+  });
+  assert.deepEqual(parseManualCommand('/logwork jira'), {
+    type: 'logwork',
+    target: 'jira',
+    text: undefined
+  });
+  assert.deepEqual(parseManualCommand('/logwork both'), {
+    type: 'logwork',
+    target: 'both',
+    text: undefined
+  });
+  assert.deepEqual(parseManualCommand('/logwork Monday, 01 Jun 2026'), {
+    type: 'logwork',
+    text: 'Monday, 01 Jun 2026'
+  });
+  assert.deepEqual(parseManualCommand('/auth ro'), {
+    type: 'auth',
+    target: 'ro'
+  });
+  assert.deepEqual(parseManualCommand('/auth jira'), {
+    type: 'auth',
+    target: 'jira'
+  });
+  assert.deepEqual(parseManualCommand('/status ro'), {
+    type: 'status',
+    target: 'ro'
+  });
+  assert.deepEqual(parseManualCommand('/status jira'), {
+    type: 'status',
+    target: 'jira'
   });
   assert.deepEqual(parseManualCommand('/mcp'), {
     type: 'mcp',
@@ -350,6 +425,8 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
   });
   assert.deepEqual(parseManualCommand('/diagnostics'), { type: 'diagnostics' });
   assert.deepEqual(parseManualCommand('/apply'), { type: 'apply' });
+  assert.deepEqual(parseManualCommand('/apply jira'), { type: 'apply', target: 'jira' });
+  assert.deepEqual(parseManualCommand('/apply both'), { type: 'apply', target: 'both' });
   assert.deepEqual(parseManualCommand('/projects'), {
     type: 'projects',
     project: undefined
@@ -366,6 +443,10 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
   assert.throws(() => parseManualCommand('/exit'), /Unknown command/);
   assert.throws(() => parseManualCommand('/quit'), /Unknown command/);
   assert.throws(() => parseManualCommand('/query sometime'), /Usage: \/query/);
+  assert.throws(() => parseManualCommand('/query 2026-06-05'), /Usage: \/query/);
+  assert.throws(() => parseManualCommand('/query 2026-06-01..2026-06-08'), /Usage: \/query/);
+  assert.throws(() => parseManualCommand('/auth both'), /Usage: \/auth/);
+  assert.throws(() => parseManualCommand('/status both'), /Usage: \/status/);
   assert.throws(() => parseManualCommand('/preview'), /Unknown command/);
   assert.throws(() => parseManualCommand('/mcp unknown'), /Unknown MCP client/);
   assert.throws(() => parseManualCommand('/unknown'), /Unknown command/);
@@ -460,6 +541,38 @@ test('manual diagnostics writes support report summary', async () => {
   assert.match(printed.join('\n'), /Send this sanitized file/);
 });
 
+test('manual auth and status route Resource Optimiser and Jira targets', async () => {
+  const printed = [];
+  const session = createManualSession();
+  const workflows = {
+    loginResourceOptimiser: async () => ({ summary: 'RO auth complete.' }),
+    getStoredAuthStatus: async () => ({ summary: 'RO authenticated.' }),
+    getStoredJiraStatus: async () => ({ summary: 'Jira authenticated.' })
+  };
+
+  await executeManualCommand(parseManualCommand('/auth ro'), session, context({
+    workflows,
+    printed
+  }));
+  await executeManualCommand(parseManualCommand('/auth jira'), session, context({
+    workflows,
+    printed
+  }));
+  await executeManualCommand(parseManualCommand('/status'), session, context({
+    workflows,
+    printed
+  }));
+  await executeManualCommand(parseManualCommand('/status jira'), session, context({
+    workflows,
+    printed
+  }));
+
+  assert.match(printed.join('\n'), /RO auth complete/);
+  assert.match(printed.join('\n'), /logwork-helper jira login/);
+  assert.match(printed.join('\n'), /Resource Optimiser: RO authenticated/);
+  assert.match(printed.join('\n'), /Jira: Jira authenticated/);
+});
+
 test('manual logwork fallback stores last preview from pasted text', async () => {
   const printed = [];
   const session = createManualSession();
@@ -476,15 +589,122 @@ test('manual logwork fallback stores last preview from pasted text', async () =>
     workflows,
     printed,
     lines: [
+      'ro',
       'Monday, 01 Jun 2026',
       '+2 Maintenance mode (SCB-213)',
       '/end'
     ]
   }));
 
-  assert.equal(session.lastPreview.status, 'ready');
-  assert.match(printed.join('\n'), /Paste weekly logwork text/);
+  assert.equal(session.previews.ro.status, 'ready');
+  assert.equal(session.activeTarget, 'ro');
+  assert.match(printed.join('\n'), /Paste Resource Optimiser weekly logwork text/);
   assert.match(printed.join('\n'), /Ready to apply/);
+});
+
+test('manual Jira logwork previews and applies independently', async () => {
+  const printed = [];
+  const session = createManualSession();
+  const workflows = {
+    previewJiraWorklogBatch: async ({ text }) => {
+      assert.match(text, /Maintenance mode/);
+      return readyJiraPreview({
+        summary: 'Jira preview:\nReady to apply.'
+      });
+    },
+    applyJiraWorklogBatch: async ({ batch, confirm }) => {
+      assert.equal(batch, session.previews.jira);
+      assert.equal(confirm, true);
+      return {
+        summary: 'Jira worklog submitted.'
+      };
+    }
+  };
+
+  await executeManualCommand(parseManualCommand('/logwork jira'), session, context({
+    workflows,
+    printed,
+    lines: [
+      'Monday, 01 Jun 2026',
+      '+2 Maintenance mode (SCB-213)',
+      '/end'
+    ]
+  }));
+
+  assert.equal(session.activeTarget, 'jira');
+  assert.equal(session.previews.jira.status, 'ready');
+  assert.match(printed.join('\n'), /Jira preview/);
+
+  await executeManualCommand(parseManualCommand('/apply jira'), session, context({
+    workflows,
+    prompts: confirmations([true]),
+    printed
+  }));
+
+  assert.equal(session.previews.jira, null);
+  assert.match(printed.join('\n'), /Jira worklog submitted/);
+});
+
+test('manual Jira logwork reports login command when auth is missing', async () => {
+  const session = createManualSession();
+  await assert.rejects(() => executeManualCommand(parseManualCommand('/logwork jira'), session, context({
+    workflows: {
+      previewJiraWorklogBatch: async () => {
+        throw createJiraAuthRequiredError();
+      }
+    },
+    lines: [
+      'Monday, 01 Jun 2026',
+      '+2 Maintenance mode (SCB-213)',
+      '/end'
+    ]
+  })), /logwork-helper jira login/);
+});
+
+test('manual both logwork previews and applies RO then Jira with separate confirmations', async () => {
+  const printed = [];
+  const session = createManualSession();
+  const calls = [];
+  const workflows = {
+    previewLogworkBatch: async () => readyPreview({ summary: 'RO preview ready.' }),
+    previewJiraWorklogBatch: async () => readyJiraPreview({ summary: 'Jira preview ready.' }),
+    applyLogworkBatch: async ({ confirm }) => {
+      calls.push('ro');
+      assert.equal(confirm, true);
+      return { summary: 'RO submitted.' };
+    },
+    applyJiraWorklogBatch: async ({ confirm }) => {
+      calls.push('jira');
+      assert.equal(confirm, true);
+      return { summary: 'Jira submitted.' };
+    }
+  };
+
+  await executeManualCommand(parseManualCommand('/logwork both'), session, context({
+    workflows,
+    printed,
+    lines: [
+      'Monday, 01 Jun 2026',
+      '+2 Maintenance mode (SCB-213)',
+      '/end'
+    ]
+  }));
+
+  assert.equal(session.activeTarget, 'both');
+  assert.equal(session.previews.ro.status, 'ready');
+  assert.equal(session.previews.jira.status, 'ready');
+  assert.match(printed.join('\n'), /Resource Optimiser preview/);
+  assert.match(printed.join('\n'), /Jira preview/);
+
+  await executeManualCommand(parseManualCommand('/apply both'), session, context({
+    workflows,
+    prompts: confirmations([true, true]),
+    printed
+  }));
+
+  assert.deepEqual(calls, ['ro', 'jira']);
+  assert.equal(session.previews.ro, null);
+  assert.equal(session.previews.jira, null);
 });
 
 test('manual logwork draft helpers build text, overrides, and live preview', async () => {
@@ -758,7 +978,7 @@ test('manual apply blocks when no preview or unresolved entries exist', async ()
   await executeManualCommand(parseManualCommand('/apply'), session, context({ printed }));
   assert.match(printed.at(-1), /No preview available/);
 
-  session.lastPreview = {
+  session.previews.ro = {
     entries: [],
     errors: [],
     unresolvedEntries: [{ id: 'entry_1' }],
@@ -804,7 +1024,7 @@ test('formatProjectChart handles unbooked logged work', () => {
 test('manual apply requires extra confirmation for unbooked entries', async () => {
   const printed = [];
   const session = createManualSession();
-  session.lastPreview = readyPreview({
+  session.previews.ro = readyPreview({
     status: 'ready_with_unbooked',
     unbookedEntries: [{ id: 'entry_1' }]
   });
@@ -829,14 +1049,14 @@ test('manual apply requires extra confirmation for unbooked entries', async () =
 test('manual apply submits approved preview and clears last preview', async () => {
   const printed = [];
   const session = createManualSession();
-  session.lastPreview = readyPreview({
+  session.previews.ro = readyPreview({
     status: 'ready_with_unbooked',
     unbookedEntries: [{ id: 'entry_1' }]
   });
   const prompts = confirmations([true, true]);
   const workflows = {
     applyLogworkBatch: async ({ batch, confirm, allowUnbooked }) => {
-      assert.equal(batch, session.lastPreview);
+      assert.equal(batch, session.previews.ro);
       assert.equal(confirm, true);
       assert.equal(allowUnbooked, true);
       return {
@@ -854,7 +1074,7 @@ test('manual apply submits approved preview and clears last preview', async () =
     printed
   }));
 
-  assert.equal(session.lastPreview, null);
+  assert.equal(session.previews.ro, null);
   assert.match(printed.join('\n'), /Logwork submitted/);
   assert.match(printed.join('\n'), /Verified totals/);
 });
@@ -931,10 +1151,13 @@ function context({
       queryLogwork: async () => ({ summary: 'query' }),
       previewLogworkBatch: async () => readyPreview(),
       applyLogworkBatch: async () => ({ summary: 'applied' }),
+      previewJiraWorklogBatch: async () => readyJiraPreview(),
+      applyJiraWorklogBatch: async () => ({ summary: 'jira applied' }),
       listLogworkProjects: async () => ({ summary: 'projects', projects: [], mappings: [] }),
       upsertProjectMapping: async () => ({ summary: 'mapped' }),
       loginResourceOptimiser: async () => ({ summary: 'auth' }),
       getStoredAuthStatus: async () => ({ summary: 'status' }),
+      getStoredJiraStatus: async () => ({ summary: 'jira status' }),
       ...workflows
     },
     prompts,
@@ -979,6 +1202,29 @@ function readyPreview(overrides = {}) {
     unresolvedEntries: [],
     unbookedEntries: [],
     summary: 'Logwork preview:\nReady to apply.',
+    ...overrides
+  };
+}
+
+function readyJiraPreview(overrides = {}) {
+  return {
+    batchId: 'jira_batch_1',
+    status: 'ready',
+    errors: [],
+    entries: [
+      {
+        id: 'entry_1',
+        batchId: 'jira_batch_1',
+        date: '2026-06-01',
+        hours: 2,
+        taskName: 'Maintenance mode (SCB-213)',
+        tickets: ['SCB-213'],
+        issueKey: 'SCB-213',
+        status: 'ready',
+        reason: 'single_issue_key'
+      }
+    ],
+    summary: 'Jira worklog preview:\nReady to apply.',
     ...overrides
   };
 }

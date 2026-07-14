@@ -6,6 +6,7 @@ test('CONFIG keeps the default Vinova Resource Optimiser profile', () => {
   assert.equal(CONFIG.profile, 'vinova');
   assert.equal(CONFIG.apiBase, 'https://api.resourceoptimiser.com/api/v1');
   assert.equal(CONFIG.loginUrl, 'https://app.resourceoptimiser.com/vinova');
+  assert.equal(CONFIG.jiraBaseUrl, 'https://jira-vnv.vinova.sg');
   assert.deepEqual(CONFIG.allowedSafariHosts, ['app.resourceoptimiser.com']);
   assert.equal(CONFIG.keycloakHost, 'keycloak.vinova.sg');
 });
@@ -15,6 +16,7 @@ test('buildConfig applies validated environment overrides', () => {
     LOGWORK_HELPER_PROFILE: 'staging',
     LOGWORK_API_BASE: 'https://api.staging.example.com/api/v1',
     LOGWORK_LOGIN_URL: 'https://app.staging.example.com/acme',
+    LOGWORK_JIRA_BASE_URL: 'https://jira.staging.example.com',
     LOGWORK_TOKEN_KEY: 'acme_access_token',
     LOGWORK_ALLOWED_SAFARI_HOSTS: 'app.staging.example.com, app2.staging.example.com,app.staging.example.com',
     LOGWORK_KEYCLOAK_AUTH_URL: 'https://keycloak.staging.example.com/auth',
@@ -30,6 +32,7 @@ test('buildConfig applies validated environment overrides', () => {
   assert.equal(config.profile, 'staging');
   assert.equal(config.apiBase, 'https://api.staging.example.com/api/v1');
   assert.equal(config.loginUrl, 'https://app.staging.example.com/acme');
+  assert.equal(config.jiraBaseUrl, 'https://jira.staging.example.com');
   assert.equal(config.tokenKey, 'acme_access_token');
   assert.deepEqual(config.allowedSafariHosts, [
     'app.staging.example.com',

@@ -41,6 +41,7 @@
     "diagnostics-cli.mjs",
     "install-user.mjs",
     "install.mjs",
+    "jira-cli.mjs",
     "logwork-helper.mjs",
     "manual-log.mjs",
     "mcp-server.mjs",

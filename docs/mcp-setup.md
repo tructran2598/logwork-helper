@@ -107,6 +107,10 @@ After editing config, restart or reload the IDE. The MCP server should expose:
 - `list_logwork_projects`
 - `upsert_project_mapping`
 - `start_auth_login`
+- `start_jira_auth`
+- `get_jira_issue`
+- `preview_jira_worklog_batch`
+- `apply_jira_worklog_batch`
 
 If an MCP tool says auth is required, ask your assistant to call `start_auth_login` or run this yourself:
 
@@ -115,6 +119,14 @@ logwork-helper auth login
 ```
 
 On Windows, run the same command from PowerShell.
+
+If a Jira MCP tool says auth is required, ask your assistant to call `start_jira_auth` or run this yourself:
+
+```bash
+logwork-helper jira login
+```
+
+The Jira login prompt accepts a Personal Access Token in Terminal only. It does not accept username/password or tokens through MCP.
 
 Do not paste passwords, 2FA codes, Bearer tokens, cookies, or raw auth logs into AI chat.
 
@@ -139,6 +151,12 @@ Monday, 01 Jun 2026
 ```
 
 ```text
+Preview this Jira worklog and ask for my approval before submitting:
+Monday, 01 Jun 2026
++2 Maintenance mode management and status UI (SCB-213)
+```
+
+```text
 Set up the SCB ticket mapping to project 2621A-SIT-HTML BUILDER-PRJ.
 ```
 
@@ -153,12 +171,24 @@ Check whether I have logged anything today.
 ```
 
 ```text
+Check whether I logged anything yesterday.
+```
+
+```text
 List the days and projects I logged work for this week, including task details.
+```
+
+```text
+List my logged work for last week.
+```
+
+```text
+Summarize my logwork for this month.
 ```
 
 The assistant should call `query_logwork`. This is read-only and does not need confirmation.
 
-### Preview Then Apply
+### Preview Then Apply Resource Optimiser
 
 Use weekly text like this:
 
@@ -177,6 +207,60 @@ Expected flow:
 3. Assistant calls `apply_logwork_batch` with the returned `batchId` only after you approve.
 
 `apply_logwork_batch` requires `confirm: true` and a cached `batchId` from the preview step. If the preview expired or changed, rerun `preview_logwork_batch` before applying.
+
+Use `preview_logwork_batch` and `apply_logwork_batch` only for Resource Optimiser. These tools do not write Jira worklogs.
+
+### Preview Then Apply Jira Worklogs
+
+Jira worklogs are separate from Resource Optimiser logwork. Applying Resource Optimiser logwork does not write to Jira.
+
+First authenticate Jira in Terminal:
+
+```bash
+logwork-helper jira login
+```
+
+Use the same weekly text format, but each Jira worklog entry must include exactly one Jira issue key:
+
+```text
+Monday, 01 Jun 2026
++2 Maintenance mode management and status UI (SCB-213)
+Tuesday, 02 Jun 2026
++1 Fix regression after deploy (SCB-214)
+```
+
+Expected flow:
+
+1. Assistant calls `preview_jira_worklog_batch`.
+2. Assistant shows ready, unresolved, and duplicate entries, then asks for approval.
+3. Assistant calls `apply_jira_worklog_batch` with the returned `batchId` only after you approve.
+
+`apply_jira_worklog_batch` requires `confirm: true` and a cached `batchId` from `preview_jira_worklog_batch`. If the preview expired, changed, has no ticket, has multiple tickets, or detects duplicate Jira worklogs, rerun preview after fixing the text.
+
+Duplicate detection is blocking. A Jira worklog is duplicate when it has the same short helper marker (`#lh:<hash>`), or the same issue, date, duration, and normalized task comment. Legacy `[logwork-helper:...]` markers are still recognized. There is no override option in v1.
+
+Jira worklog writes use:
+
+```text
+started: 09:00 Asia/Ho_Chi_Minh on the entry date
+timeSpentSeconds: hours * 3600
+comment: task name plus short helper marker, for example #lh:8f3a91c0
+adjustEstimate: leave
+```
+
+### Preview Then Apply Both
+
+For the same text, the assistant should run two separate previews:
+
+1. `preview_logwork_batch` for Resource Optimiser.
+2. `preview_jira_worklog_batch` for Jira.
+
+The assistant should show both summaries, then request approval separately:
+
+1. Apply Resource Optimiser with `apply_logwork_batch` and `confirm: true`.
+2. Apply Jira with `apply_jira_worklog_batch` and `confirm: true`.
+
+The two apply steps are intentionally not atomic. A Resource Optimiser apply never writes Jira, and a Jira apply never writes Resource Optimiser.
 
 ### Set Up Project Mapping
 

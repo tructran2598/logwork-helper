@@ -4,11 +4,11 @@
 [npm downloads](https://www.npmjs.com/package/logwork-helper)
 [license](LICENSE)
 
-Local MCP server and terminal CLI for Resource Optimiser logwork.
+Local MCP server and terminal CLI for Resource Optimiser logwork and Jira self-hosted worklogs.
 
-Logwork Helper lets Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, Claude Code, and other MCP clients work with Resource Optimiser from your machine. It can query logged work, preview and submit approved logwork, map ticket prefixes to Resource Optimiser projects, and run a guided terminal flow through `logwork`.
+Logwork Helper lets Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, Claude Code, and other MCP clients work with Resource Optimiser from your machine. It can query logged work, preview and submit approved Resource Optimiser logwork, preview and submit approved Jira worklogs, map ticket prefixes to Resource Optimiser projects, and run a guided terminal flow through `logwork`.
 
-Credentials stay local. Passwords and 2FA codes are entered in Terminal only, never in MCP config or AI chat.
+Credentials stay local. Resource Optimiser passwords and 2FA codes, and Jira Personal Access Tokens, are entered in Terminal only, never in MCP config or AI chat.
 
 ## Install
 
@@ -46,6 +46,25 @@ Check auth status:
 
 ```bash
 logwork-helper auth status
+```
+
+For Jira self-hosted worklogs, create a Jira Personal Access Token in Jira, then save it from Terminal:
+
+```bash
+logwork-helper jira login
+```
+
+The default Jira URL is `https://jira-vnv.vinova.sg`. Override it with:
+
+```bash
+logwork-helper jira login --base-url https://jira.example.com
+```
+
+Check or delete Jira auth without printing the token:
+
+```bash
+logwork-helper jira status
+logwork-helper jira logout
 ```
 
 ## Set Up MCP
@@ -105,6 +124,12 @@ Monday, 01 Jun 2026
 ```
 
 ```text
+Preview this Jira worklog and ask for my approval before submitting:
+Monday, 01 Jun 2026
++2 Maintenance mode management and status UI (SCB-213)
+```
+
+```text
 Set up the SCB ticket mapping to project 2621A-SIT-HTML BUILDER-PRJ.
 ```
 
@@ -114,12 +139,21 @@ To log work directly from Terminal:
 logwork
 ```
 
+Inside the terminal UI, `/logwork` opens a target picker. Use `/logwork ro` for Resource Optimiser, `/logwork jira` for Jira worklogs, or `/logwork both` to preview/apply both with separate approvals.
+
 Useful terminal commands:
 
 ```text
 /query today
+/query yesterday
 /query this-week
+/query last-week
+/query this-month
+/query last-month
 /logwork
+/logwork ro
+/logwork jira
+/logwork both
 /mcp
 /projects
 /projects 5234
@@ -130,7 +164,7 @@ Useful terminal commands:
 ## More Docs
 
 - [MCP setup](docs/mcp-setup.md): full client configs, exposed tools, verification prompts, and common MCP workflows.
-- [Security and auth](docs/security.md): Keycloak flow, OS credential storage, stored files, and safety model.
+- [Security and auth](docs/security.md): Keycloak flow, Jira PAT flow, OS credential storage, stored files, and safety model.
 - [Advanced usage](docs/advanced.md): environment overrides, manual REPL details, updates, troubleshooting, legacy git hook, and release checks.
 - [Release checklist](RELEASE.md): publish and manual verification checklist.
 

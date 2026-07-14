@@ -44,6 +44,16 @@ After setup:
 
 Authentication uses the Resource Optimiser / Keycloak API flow and does not open a browser.`
   }],
+  ['jira', {
+    script: 'jira-cli.mjs',
+    description: 'Manage Jira Personal Access Token authentication.',
+    help: `Usage:
+  logwork-helper jira login [--base-url <url>]
+  logwork-helper jira status
+  logwork-helper jira logout
+
+Authentication uses a Jira Personal Access Token entered in Terminal. MCP tools never accept Jira tokens.`
+  }],
   ['diagnostics', {
     script: 'diagnostics-cli.mjs',
     description: 'Write a sanitized support diagnostics report.',
@@ -77,8 +87,15 @@ Commands inside the REPL:
   Type / for live command suggestions.
   /help
   /query today
+  /query yesterday
   /query this-week
+  /query last-week
+  /query this-month
+  /query last-month
   /logwork
+  /logwork ro
+  /logwork jira
+  /logwork both
   /mcp
   /projects
   /projects 5234
@@ -165,6 +182,7 @@ function printHelp() {
   console.log(`Usage:
   logwork-helper setup-user
   logwork-helper auth login
+  logwork-helper jira login
   logwork-helper diagnostics
   logwork-helper doctor
   logwork-helper mcp
@@ -176,9 +194,10 @@ function printHelp() {
 
 Primary setup:
   1. Run: logwork-helper setup-user
-  2. Paste one printed MCP config into your IDE.
-  3. Restart or reload the IDE MCP tools.
-  4. Ask: Check my logwork for this week.
+  2. Authenticate Resource Optimiser and Jira if needed.
+  3. Paste one printed MCP config into your IDE.
+  4. Restart or reload the IDE MCP tools.
+  5. Ask: Check my logwork for this week.
 
 Commands:
 ${formatCommands()}

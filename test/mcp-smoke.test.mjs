@@ -8,9 +8,13 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import {
   assertNoFinalProjectOverrides,
   consumeApprovedBatch,
+  consumeApprovedJiraBatch,
   getCachedPreview,
+  getCachedJiraPreview,
   resolveApprovedBatch,
-  setCachedPreview
+  resolveApprovedJiraBatch,
+  setCachedPreview,
+  setCachedJiraPreview
 } from '../mcp-server.mjs';
 
 test('MCP server lists logwork tools over stdio', async () => {
@@ -34,25 +38,51 @@ test('MCP server lists logwork tools over stdio', async () => {
     const result = await client.listTools();
     const names = result.tools.map((tool) => tool.name).sort();
     assert.deepEqual(names, [
+      'apply_jira_worklog_batch',
       'apply_logwork_batch',
+      'get_jira_issue',
       'list_logwork_projects',
+      'preview_jira_worklog_batch',
       'preview_logwork_batch',
       'query_logwork',
       'start_auth_login',
+      'start_jira_auth',
       'upsert_project_mapping'
     ]);
     const applyTool = result.tools.find((tool) => tool.name === 'apply_logwork_batch');
+    assert.match(applyTool.description, /Resource Optimiser only/);
+    assert.match(applyTool.description, /Does not write Jira/);
     assert.equal(applyTool.inputSchema.properties.allowUnbooked.type, 'boolean');
     assert.equal(applyTool.inputSchema.properties.projectOverrides.type, 'object');
     const setupTool = result.tools.find((tool) => tool.name === 'upsert_project_mapping');
     assert.equal(setupTool.inputSchema.properties.confirm.type, 'boolean');
     assert.deepEqual(setupTool.inputSchema.properties.scope.enum, ['user', 'project']);
     const queryTool = result.tools.find((tool) => tool.name === 'query_logwork');
-    assert.deepEqual(queryTool.inputSchema.properties.period.enum, ['today', 'this_week']);
+    assert.deepEqual(queryTool.inputSchema.properties.period.enum, ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month']);
+    assert.equal(queryTool.inputSchema.properties.date, undefined);
+    assert.equal(queryTool.inputSchema.properties.from, undefined);
+    assert.equal(queryTool.inputSchema.properties.to, undefined);
     const authTool = result.tools.find((tool) => tool.name === 'start_auth_login');
     assert.deepEqual(authTool.inputSchema.properties, {});
     assert.equal(authTool.inputSchema.properties.password, undefined);
     assert.equal(authTool.inputSchema.properties.otp, undefined);
+    const jiraAuthTool = result.tools.find((tool) => tool.name === 'start_jira_auth');
+    assert.deepEqual(jiraAuthTool.inputSchema.properties, {});
+    const jiraIssueTool = result.tools.find((tool) => tool.name === 'get_jira_issue');
+    assert.deepEqual(Object.keys(jiraIssueTool.inputSchema.properties), ['issueKey']);
+    const jiraPreviewTool = result.tools.find((tool) => tool.name === 'preview_jira_worklog_batch');
+    assert.match(jiraPreviewTool.description, /Jira only/);
+    assert.deepEqual(Object.keys(jiraPreviewTool.inputSchema.properties), ['text']);
+    const jiraApplyTool = result.tools.find((tool) => tool.name === 'apply_jira_worklog_batch');
+    assert.match(jiraApplyTool.description, /Does not write Resource Optimiser/);
+    assert.deepEqual(Object.keys(jiraApplyTool.inputSchema.properties).sort(), ['batch', 'batchId', 'confirm']);
+    assert.equal(jiraApplyTool.inputSchema.properties.confirm.type, 'boolean');
+    for (const tool of [jiraAuthTool, jiraIssueTool, jiraPreviewTool, jiraApplyTool]) {
+      assert.equal(tool.inputSchema.properties.password, undefined);
+      assert.equal(tool.inputSchema.properties.pat, undefined);
+      assert.equal(tool.inputSchema.properties.token, undefined);
+      assert.equal(tool.inputSchema.properties.username, undefined);
+    }
 
     const preview = await client.callTool({
       name: 'preview_logwork_batch',
@@ -207,6 +237,100 @@ test('MCP apply consumes cached approval before submit work can await', () => {
   }), /Missing cached preview/);
 });
 
+test('MCP Jira preview cache expires old previews and caps stored batches', () => {
+  const cache = new Map();
+  const now = 1_000;
+
+  setCachedJiraPreview(cache, { batchId: 'expired' }, now);
+  assert.equal(getCachedJiraPreview(cache, 'expired', now + 60 * 60 * 1000), null);
+  assert.equal(cache.has('expired'), false);
+
+  for (let index = 0; index < 101; index += 1) {
+    setCachedJiraPreview(cache, { batchId: `jira-batch-${index}` }, now);
+  }
+
+  assert.equal(cache.size, 100);
+  assert.equal(getCachedJiraPreview(cache, 'jira-batch-0', now), null);
+  assert.deepEqual(getCachedJiraPreview(cache, 'jira-batch-100', now), { batchId: 'jira-batch-100' });
+});
+
+test('MCP Jira apply requires cached preview provenance', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedJiraPreview();
+
+  assert.throws(() => resolveApprovedJiraBatch({
+    cache,
+    batch: preview,
+    now
+  }), /requires batchId/);
+
+  assert.throws(() => resolveApprovedJiraBatch({
+    cache,
+    batchId: preview.batchId,
+    batch: preview,
+    now
+  }), /Missing cached Jira preview/);
+
+  setCachedJiraPreview(cache, preview, now);
+  assert.throws(() => resolveApprovedJiraBatch({
+    cache,
+    batchId: preview.batchId,
+    now: now + 60 * 60 * 1000
+  }), /Missing cached Jira preview/);
+});
+
+test('MCP Jira apply rejects mutated approved batch content', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedJiraPreview();
+  setCachedJiraPreview(cache, preview, now);
+
+  for (const mutate of [
+    (batch) => { batch.entries[0].hours = 3; },
+    (batch) => { batch.entries[0].taskName = 'forged task'; },
+    (batch) => { batch.entries[0].status = 'duplicate'; },
+    (batch) => { batch.entries[0].issue.summary = 'forged issue'; },
+    (batch) => { batch.entries[0].duplicate = { id: 'new-duplicate' }; }
+  ]) {
+    const mutated = structuredClone(preview);
+    mutate(mutated);
+
+    assert.throws(() => resolveApprovedJiraBatch({
+      cache,
+      batchId: preview.batchId,
+      batch: mutated,
+      now
+    }), /content changed/);
+  }
+});
+
+test('MCP Jira apply accepts matching batch echo and consumes cached preview', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedJiraPreview();
+  setCachedJiraPreview(cache, preview, now);
+
+  const matchingEcho = structuredClone(preview);
+  matchingEcho.summary = 'client display text changed';
+
+  const approved = resolveApprovedJiraBatch({
+    cache,
+    batchId: preview.batchId,
+    batch: matchingEcho,
+    now
+  });
+
+  assert.equal(approved.summary, preview.summary);
+  const consumed = consumeApprovedJiraBatch({
+    cache,
+    batchId: preview.batchId,
+    now
+  });
+  assert.equal(consumed.entries[0].issueKey, 'SCB-213');
+  assert.equal(getCachedJiraPreview(cache, preview.batchId, now), null);
+});
+
 function createApprovedPreview() {
   return {
     batchId: 'batch-safe',
@@ -232,5 +356,33 @@ function createApprovedPreview() {
       }
     ],
     summary: 'Logwork preview:\n- 2026-06-01: +2h Course Builder - original task'
+  };
+}
+
+function createApprovedJiraPreview() {
+  return {
+    batchId: 'jira-batch-safe',
+    status: 'ready',
+    errors: [],
+    entries: [
+      {
+        id: 'entry_1',
+        batchId: 'jira-batch-safe',
+        date: '2026-06-01',
+        hours: 2,
+        taskName: 'original task',
+        tickets: ['SCB-213'],
+        issueKey: 'SCB-213',
+        issue: {
+          key: 'SCB-213',
+          summary: 'Maintenance mode',
+          status: 'In Progress',
+          issueType: 'Task'
+        },
+        status: 'ready',
+        reason: 'single_issue_key'
+      }
+    ],
+    summary: 'Jira worklog preview: ready. 1 entries, 2h total.'
   };
 }
