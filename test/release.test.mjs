@@ -37,9 +37,15 @@ test('release gate scripts are available', () => {
 
   assert.equal(packageJson.scripts['audit:prod'], 'npm audit --omit=dev --audit-level=moderate');
   assert.equal(packageJson.scripts['pack:check'], 'npm pack --dry-run');
+  assert.equal(packageJson.scripts['release:doctor'], 'node release-cli.mjs doctor --full');
+  assert.match(packageJson.scripts['test:windows-credential'], /credential-store\.test\.mjs/);
   assert.match(packageJson.scripts['release:check'], /npm test/);
   assert.match(packageJson.scripts['release:check'], /npm run audit:prod/);
   assert.match(packageJson.scripts['release:check'], /npm run pack:check/);
   assert.match(packageJson.scripts['release:check'], /git diff --check/);
   assert.ok(packageJson.files.includes('RELEASE.md'));
+  assert.ok(packageJson.files.includes('release-cli.mjs'));
+  assert.ok(packageJson.files.includes('reminder-cli.mjs'));
+  assert.ok(packageJson.files.includes('history-cli.mjs'));
+  assert.ok(packageJson.files.includes('update-cli.mjs'));
 });

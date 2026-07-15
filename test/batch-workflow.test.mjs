@@ -222,6 +222,30 @@ test('applyLogworkBatch submits one payload per line', async () => {
   assert.equal(result.verification, null);
 });
 
+test('applyLogworkBatch records a sanitized ledger outcome when a writer is provided', async () => {
+  const preview = buildLogworkBatchPreview({ parsed, projectsByDate });
+  const ledgerCalls = [];
+  const result = await applyLogworkBatch({
+    batch: preview,
+    confirm: true,
+    ledgerContext: { flowTarget: 'both' },
+    submitEntry: async () => ({ dryRun: true }),
+    recordLedger: async (record) => {
+      ledgerCalls.push(record);
+      return { id: 'ledger-ro' };
+    }
+  });
+
+  assert.deepEqual(result.ledger, {
+    status: 'recorded',
+    recorded: true,
+    recordId: 'ledger-ro'
+  });
+  assert.equal(ledgerCalls[0].target, 'ro');
+  assert.equal(ledgerCalls[0].flowTarget, 'both');
+  assert.equal(ledgerCalls[0].entries.length, 2);
+});
+
 test('applyLogworkBatch blocks unbooked entries without allowUnbooked true', async () => {
   const unbookedParsed = parseWeeklyLogText(`Monday, 01 Jun 2026
 +2 Maintenance mode management and status UI (SCB-213)`.replace('++', '+'));

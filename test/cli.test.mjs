@@ -18,7 +18,7 @@ import {
   sanitizeRuntimeMetadata
 } from '../install-user.mjs';
 import { isMainModule } from '../lib/entrypoint.mjs';
-import { parseManualArgs } from '../manual-log.mjs';
+import { getStartupUpdateNotice, parseManualArgs } from '../manual-log.mjs';
 
 test('package exposes logwork binary for manual REPL shortcut', () => {
   const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -72,6 +72,11 @@ test('CLI dispatcher prints top-level help', () => {
   assert.match(result.stdout, /logwork-helper setup-user/);
   assert.match(result.stdout, /logwork-helper auth login/);
   assert.match(result.stdout, /logwork-helper jira login/);
+  assert.match(result.stdout, /logwork-helper release doctor --full/);
+  assert.match(result.stdout, /logwork-helper update check/);
+  assert.match(result.stdout, /logwork-helper reminder status/);
+  assert.match(result.stdout, /logwork-helper reconcile this-week/);
+  assert.match(result.stdout, /logwork-helper history --target jira/);
   assert.match(result.stdout, /logwork-helper doctor/);
   assert.match(result.stdout, /logwork-helper mcp/);
   assert.match(result.stdout, /\n  logwork\n/);
@@ -123,6 +128,63 @@ test('CLI dispatcher prints diagnostics help', () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /logwork-helper diagnostics/);
   assert.match(result.stdout, /sanitized support report/);
+});
+
+test('CLI dispatcher prints release help', () => {
+  const result = spawnSync(process.execPath, ['cli.mjs', 'release', '--help'], {
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /logwork-helper release doctor \[--full\]/);
+  assert.match(result.stdout, /npm auth/);
+  assert.match(result.stdout, /npm pack --dry-run/);
+});
+
+test('CLI dispatcher prints apply history help', () => {
+  const result = spawnSync(process.execPath, ['cli.mjs', 'history', '--help'], {
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /history \[--target ro\|jira\|both\]/);
+  assert.match(result.stdout, /without credentials or raw API responses/);
+});
+
+test('CLI dispatcher prints update help without checking the network', () => {
+  const result = spawnSync(process.execPath, ['cli.mjs', 'update', '--help'], {
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /update check \[--force\]/);
+  assert.match(result.stdout, /update install \[--version <semver>\]/);
+  assert.match(result.stdout, /preserves local state and OS credentials/);
+  assert.equal(result.stderr, '');
+});
+
+test('CLI dispatcher prints reminder help without installing an OS schedule', () => {
+  const result = spawnSync(process.execPath, ['cli.mjs', 'reminder', '--help'], {
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /reminder enable \[--time HH:mm\]/);
+  assert.match(result.stdout, /reminder status \[--json\]/);
+  assert.match(result.stdout, /launchd on macOS or Task Scheduler on Windows/);
+  assert.equal(result.stderr, '');
+});
+
+test('CLI dispatcher prints reconcile help without querying RO or Jira', () => {
+  const result = spawnSync(process.execPath, ['cli.mjs', 'reconcile', '--help'], {
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /reconcile \[today\|yesterday\|this-week/);
+  assert.match(result.stdout, /Read-only comparison/);
+  assert.match(result.stdout, /target-specific preview and approval/);
+  assert.equal(result.stderr, '');
 });
 
 test('CLI dispatcher prints doctor help', () => {
@@ -190,6 +252,7 @@ test('CLI dispatcher prints manual REPL help', () => {
   assert.match(result.stdout, /\/logwork ro/);
   assert.match(result.stdout, /\/logwork jira/);
   assert.match(result.stdout, /\/logwork both/);
+  assert.match(result.stdout, /\/history/);
   assert.doesNotMatch(result.stdout, /\/apply/);
   assert.doesNotMatch(result.stdout, /\/exit/);
 });
@@ -629,6 +692,22 @@ test('manual parser defaults to REPL and keeps quick compatibility', () => {
     message: 'Fix login bug',
     help: false
   });
+});
+
+test('manual startup update notice is actionable and never blocks on check failure', async () => {
+  const notice = await getStartupUpdateNotice({
+    checkForUpdatesFn: async () => ({
+      updateAvailable: true,
+      currentVersion: '0.1.10',
+      latestVersion: '0.1.11'
+    })
+  });
+  assert.match(notice, /0\.1\.10 -> 0\.1\.11/);
+  assert.match(notice, /logwork-helper update install/);
+
+  assert.equal(await getStartupUpdateNotice({
+    checkForUpdatesFn: async () => { throw new Error('offline'); }
+  }), '');
 });
 
 test('CLI dispatcher rejects browser auth options before login', () => {

@@ -10,6 +10,14 @@ Run the local release gate:
 npm run release:check
 ```
 
+Before publishing, run the release preflight doctor:
+
+```bash
+logwork-helper release doctor --full
+```
+
+This checks version consistency, git cleanliness, npm auth, npm latest version, GitHub auth, tag/release state, local tarball artifacts, tests, audit, pack dry-run, and diff whitespace.
+
 The gate must pass all of the following:
 
 - `npm test`
@@ -23,7 +31,13 @@ The gate must pass all of the following:
 - Run `logwork-helper setup-user --no-login`.
 - Confirm the printed MCP config uses the resolved `~/.logwork-helper/mcp-server.mjs` path.
 - Run `logwork-helper --help`.
+- Run `logwork-helper update check --force` against the published npm version.
 - Run `logwork-helper mcp` through an MCP client smoke test.
+- Confirm MCP lists `check_for_updates` and `apply_update`, and that `apply_update` requires `confirm: true`.
+- Confirm MCP lists read-only `reconcile_logwork` with preset periods only and no credential or confirmation fields.
+- Run `logwork-helper reconcile this-week` and confirm it reports RO/Jira daily totals without writing either system.
+- Confirm the Windows CI job passes the dedicated `Verify Windows Credential Manager integration` step.
+- Run `logwork-helper reminder test`, confirm a native notification appears, then verify `reminder status` and clean up with `reminder disable`.
 - Run `logwork-helper auth status` and confirm no token is printed.
 
 ## Safety Checks

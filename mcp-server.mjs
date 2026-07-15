@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { ApiError } from './lib/api.mjs';
+import { queryApplyLedger } from './lib/apply-ledger.mjs';
 import {
   applyLogworkBatch,
   formatToolResponse,
@@ -28,6 +29,14 @@ import {
 } from './lib/project-mapping-workflow.mjs';
 import { readPackageVersion } from './lib/package-info.mjs';
 import { queryLogwork } from './lib/query-workflow.mjs';
+import { reconcileLogwork } from './lib/reconciliation-workflow.mjs';
+import {
+  disableLogworkReminder,
+  enableLogworkReminder,
+  getLogworkReminderStatus,
+  testLogworkReminder
+} from './lib/reminder-service.mjs';
+import { checkForUpdates, installUpdate } from './lib/update-service.mjs';
 
 const PREVIEW_TTL_MS = 60 * 60 * 1000;
 const MAX_PREVIEWS = 100;
@@ -97,6 +106,94 @@ server.registerTool('query_logwork', {
   });
   return formatToolResponse(result);
 }));
+
+server.registerTool('reconcile_logwork', {
+  description: 'Read-only: compare Resource Optimiser and Jira worklog hours by day for a preset period. Returns mismatches and high-confidence correction suggestions, but never writes either system.',
+  inputSchema: {
+    period: z.enum(['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month']).optional().describe('Preset reconciliation period. Defaults to this_week.')
+  }
+}, withRoAndJiraAuthRequiredHandling(async ({ period = 'this_week' }) => {
+  const result = await reconcileLogwork({ period });
+  return formatToolResponse(result);
+}));
+
+server.registerTool('query_apply_history', {
+  description: 'Read the local apply result ledger for Resource Optimiser and Jira. Target both means entries applied from a combined Both flow. Never returns credentials or raw API responses.',
+  inputSchema: {
+    target: z.enum(['ro', 'jira', 'both']).optional().describe('Optional target filter.'),
+    limit: z.number().int().min(1).max(100).optional().describe('Maximum records to return. Defaults to 20.')
+  }
+}, async ({ target, limit = 20 }) => {
+  const result = await queryApplyLedger({ target, limit });
+  return formatToolResponse(result);
+});
+
+server.registerTool('check_for_updates', {
+  description: 'Read-only: compare the running Logwork Helper version with npm latest. Uses a 24-hour cache unless force is true.',
+  inputSchema: {
+    force: z.boolean().optional().describe('Ignore the local update cache and query npm now. Defaults to false.')
+  }
+}, async ({ force = false }) => {
+  const result = await checkForUpdates({ force });
+  return formatToolResponse(result);
+});
+
+server.registerTool('apply_update', {
+  description: 'Install the exact npm latest Logwork Helper version after explicit approval. Preserves local state and credentials. Requires confirm: true; reconnect MCP after success.',
+  inputSchema: {
+    version: z.string().regex(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/).optional().describe('Optional exact SemVer approved by the user. It must equal npm latest.'),
+    confirm: z.boolean().describe('Must be true after explicit user approval.')
+  }
+}, async ({ version, confirm }) => {
+  if (confirm !== true) {
+    throw new Error('apply_update requires confirm: true.');
+  }
+  const result = await installUpdate({
+    version,
+    confirm,
+    stdio: 'pipe'
+  });
+  return formatToolResponse(result);
+});
+
+server.registerTool('get_logwork_reminder', {
+  description: 'Read-only: show the configured native macOS/Windows logwork reminder, OS scheduler status, and last background run.',
+  inputSchema: {}
+}, async () => formatToolResponse(await getLogworkReminderStatus()));
+
+server.registerTool('configure_logwork_reminder', {
+  description: 'Enable or disable the native OS logwork reminder after explicit approval. Uses launchd on macOS and Task Scheduler on Windows; no credentials are stored in the schedule.',
+  inputSchema: {
+    action: z.enum(['enable', 'disable']).describe('Whether to install/update or remove the OS reminder schedule.'),
+    time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().describe('Local OS time in 24-hour HH:mm format. Defaults to 17:30.'),
+    target: z.enum(['ro', 'jira', 'both']).optional().describe('Reminder target. Defaults to both.'),
+    confirm: z.boolean().describe('Must be true after explicit user approval.')
+  }
+}, async ({ action, time, target, confirm }) => {
+  if (confirm !== true) {
+    throw new Error('configure_logwork_reminder requires confirm: true.');
+  }
+  if (action === 'disable' && (time || target)) {
+    throw new Error('time and target are only valid when enabling the reminder.');
+  }
+  const result = action === 'enable'
+    ? await enableLogworkReminder({ time, target, confirm })
+    : await disableLogworkReminder({ confirm });
+  return formatToolResponse(result);
+});
+
+server.registerTool('test_logwork_reminder', {
+  description: 'Send a native OS test notification after explicit approval. Does not query or write RO/Jira logwork.',
+  inputSchema: {
+    target: z.enum(['ro', 'jira', 'both']).optional().describe('Sample notification target. Defaults to the configured target.'),
+    confirm: z.boolean().describe('Must be true after explicit user approval because this displays an OS notification.')
+  }
+}, async ({ target, confirm }) => {
+  if (confirm !== true) {
+    throw new Error('test_logwork_reminder requires confirm: true.');
+  }
+  return formatToolResponse(await testLogworkReminder({ target, confirm }));
+});
 
 server.registerTool('list_logwork_projects', {
   description: 'List Resource Optimiser project memberships and current local logwork project mappings without changing data.',
@@ -407,6 +504,7 @@ export function createJiraPreviewFingerprint(preview = {}) {
       status: textOrNull(entry?.status),
       reason: textOrNull(entry?.reason),
       issue: jiraIssueFingerprint(entry?.issue),
+      worklog: jiraWorklogPayloadFingerprint(entry?.worklog),
       duplicate: jiraDuplicateFingerprint(entry?.duplicate)
     }))
   });
@@ -440,7 +538,23 @@ function jiraIssueFingerprint(issue) {
     key: textOrNull(issue.key),
     summary: textOrNull(issue.summary),
     status: textOrNull(issue.status),
-    issueType: textOrNull(issue.issueType)
+    issueType: textOrNull(issue.issueType),
+    project: issue.project && typeof issue.project === 'object' ? {
+      key: textOrNull(issue.project.key),
+      name: textOrNull(issue.project.name)
+    } : null
+  };
+}
+
+function jiraWorklogPayloadFingerprint(worklog) {
+  if (!worklog || typeof worklog !== 'object') {
+    return null;
+  }
+
+  return {
+    started: textOrNull(worklog.started),
+    timeSpentSeconds: numberOrNull(worklog.timeSpentSeconds),
+    comment: textOrNull(worklog.comment)
   };
 }
 
@@ -502,6 +616,22 @@ function withJiraAuthRequiredHandling(handler) {
     try {
       return await handler(args);
     } catch (error) {
+      if (isJiraAuthRequiredError(error) || (error instanceof ApiError && error.status === 401)) {
+        return formatToolResponse(jiraAuthRequiredPayload(error));
+      }
+      throw error;
+    }
+  };
+}
+
+function withRoAndJiraAuthRequiredHandling(handler) {
+  return async (args) => {
+    try {
+      return await handler(args);
+    } catch (error) {
+      if (isAuthRequiredError(error)) {
+        return formatToolResponse(authRequiredPayload(error));
+      }
       if (isJiraAuthRequiredError(error) || (error instanceof ApiError && error.status === 401)) {
         return formatToolResponse(jiraAuthRequiredPayload(error));
       }

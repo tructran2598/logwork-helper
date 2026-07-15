@@ -5,9 +5,9 @@ status: active
 created: 2026-06-10
 ---
 
-# Logwork Helper Pitch Vault
+# Logwork Helper Documentation Vault
 
-This vault documents the twenty-one safety, reliability, release, and product-surface pitches for Logwork Helper. P21 is implemented and committed locally.
+This vault documents the twenty-one completed safety, reliability, release, and product-surface pitches, plus current release and operator documentation for Logwork Helper.
 
 ## Navigation
 
@@ -15,6 +15,12 @@ This vault documents the twenty-one safety, reliability, release, and product-su
 - [[pitch-timeline|Pitch Timeline]]
 - [[definition-of-done|Definition of Done]]
 - [[review-report|Multi-Phase Review Report]]
+
+## Product And Release Notes
+
+- [[releases/v0.1.10|v0.1.10 - Jira Self-hosted And RO/Jira Target Flow]]
+- [[changes/uncommitted-after-v0.1.10|Uncommitted Changes After v0.1.10]]
+- [[guides/cli-mcp-operations|CLI And MCP Operations Guide]]
 
 ## Pitch Map
 
@@ -53,6 +59,8 @@ This vault documents the twenty-one safety, reliability, release, and product-su
 ## Current Git State At Time Of Documentation
 
 - Branch: `main`
-- Local pitch commits documented: 21
-- Implemented pitches pending local commit: 0
-- Push status: not pushed
+- Released baseline: tag `v0.1.10`, commit `ec79dbe`
+- Snapshot date: 2026-07-15
+- Before this documentation update: 30 tracked files modified and 21 untracked files, 51 files total
+- Package version in the worktree: `0.1.10`
+- The post-`v0.1.10` worktree is not committed or published

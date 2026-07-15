@@ -4,7 +4,8 @@ import {
   addJiraIssueWorklog,
   getJiraIssueWorklogs,
   getJiraMyself,
-  jiraApiFetch
+  jiraApiFetch,
+  searchJiraIssues
 } from '../lib/jira-api.mjs';
 
 test('jiraApiFetch sends Bearer PAT and preserves Jira context path', async () => {
@@ -143,6 +144,31 @@ test('getJiraIssueWorklogs paginates and normalizes object comments', async () =
   ]);
   assert.deepEqual(result.map((worklog) => worklog.id), ['10001', '10002', '10003']);
   assert.equal(result[0].comment, 'Investigate issue');
+});
+
+test('searchJiraIssues encodes JQL and paginates reminder issue matches', async () => {
+  const urls = [];
+  const issues = await searchJiraIssues('pat-secret', {
+    jql: 'worklogAuthor = currentUser() AND worklogDate = "2026-07-15"',
+    fields: ['key', 'summary'],
+    pageSize: 1
+  }, {
+    baseUrl: 'https://jira.example.com',
+    fetchImpl: async (url) => {
+      urls.push(url);
+      const startAt = new URL(url).searchParams.get('startAt');
+      return jsonResponse({
+        total: 2,
+        issues: [{
+          id: startAt === '0' ? '1' : '2',
+          key: startAt === '0' ? 'SCB-213' : 'SCB-214',
+          fields: { summary: startAt === '0' ? 'First' : 'Second' }
+        }]
+      });
+    }
+  });
+  assert.equal(new URL(urls[0]).searchParams.get('jql'), 'worklogAuthor = currentUser() AND worklogDate = "2026-07-15"');
+  assert.deepEqual(issues.map((issue) => issue.key), ['SCB-213', 'SCB-214']);
 });
 
 function jsonResponse(value, { status = 200, statusText = 'OK' } = {}) {

@@ -7,6 +7,8 @@ test('CONFIG keeps the default Vinova Resource Optimiser profile', () => {
   assert.equal(CONFIG.apiBase, 'https://api.resourceoptimiser.com/api/v1');
   assert.equal(CONFIG.loginUrl, 'https://app.resourceoptimiser.com/vinova');
   assert.equal(CONFIG.jiraBaseUrl, 'https://jira-vnv.vinova.sg');
+  assert.equal(CONFIG.jiraStartedTime, '09:00');
+  assert.equal(CONFIG.timezone, 'Asia/Ho_Chi_Minh');
   assert.deepEqual(CONFIG.allowedSafariHosts, ['app.resourceoptimiser.com']);
   assert.equal(CONFIG.keycloakHost, 'keycloak.vinova.sg');
 });
@@ -17,6 +19,8 @@ test('buildConfig applies validated environment overrides', () => {
     LOGWORK_API_BASE: 'https://api.staging.example.com/api/v1',
     LOGWORK_LOGIN_URL: 'https://app.staging.example.com/acme',
     LOGWORK_JIRA_BASE_URL: 'https://jira.staging.example.com',
+    LOGWORK_JIRA_STARTED_TIME: '08:30',
+    LOGWORK_TIMEZONE: 'Asia/Singapore',
     LOGWORK_TOKEN_KEY: 'acme_access_token',
     LOGWORK_ALLOWED_SAFARI_HOSTS: 'app.staging.example.com, app2.staging.example.com,app.staging.example.com',
     LOGWORK_KEYCLOAK_AUTH_URL: 'https://keycloak.staging.example.com/auth',
@@ -33,6 +37,8 @@ test('buildConfig applies validated environment overrides', () => {
   assert.equal(config.apiBase, 'https://api.staging.example.com/api/v1');
   assert.equal(config.loginUrl, 'https://app.staging.example.com/acme');
   assert.equal(config.jiraBaseUrl, 'https://jira.staging.example.com');
+  assert.equal(config.jiraStartedTime, '08:30');
+  assert.equal(config.timezone, 'Asia/Singapore');
   assert.equal(config.tokenKey, 'acme_access_token');
   assert.deepEqual(config.allowedSafariHosts, [
     'app.staging.example.com',
@@ -67,4 +73,12 @@ test('buildConfig fails fast for invalid URL and numeric overrides', () => {
   assert.throws(() => buildConfig({
     LOGWORK_HTTP_READ_RETRIES: '-1'
   }), /LOGWORK_HTTP_READ_RETRIES must be a non-negative integer/);
+
+  assert.throws(() => buildConfig({
+    LOGWORK_JIRA_STARTED_TIME: '25:00'
+  }), /LOGWORK_JIRA_STARTED_TIME must use 24-hour HH:mm format/);
+
+  assert.throws(() => buildConfig({
+    LOGWORK_TIMEZONE: 'Mars/Olympus'
+  }), /LOGWORK_TIMEZONE must be a valid IANA timezone/);
 });

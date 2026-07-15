@@ -24,6 +24,14 @@ test('Jira worklog payload formats started, seconds, and short marker comment', 
   };
 
   assert.equal(formatJiraStarted('2026-06-01'), '2026-06-01T09:00:00.000+0700');
+  assert.equal(formatJiraStarted('2026-06-01', {
+    startedTime: '08:30',
+    timezone: 'Asia/Singapore'
+  }), '2026-06-01T08:30:00.000+0800');
+  assert.equal(formatJiraStarted('2026-01-15', {
+    startedTime: '09:15',
+    timezone: 'America/New_York'
+  }), '2026-01-15T09:15:00.000-0500');
   assert.deepEqual(buildJiraWorklogPayload(entry), {
     started: '2026-06-01T09:00:00.000+0700',
     timeSpentSeconds: 5400,
@@ -48,7 +56,12 @@ test('Jira preview blocks missing and multiple issue keys without fetching Jira'
 
   assert.equal(preview.status, 'blocked');
   assert.deepEqual(preview.entries.map((entry) => entry.reason), ['missing_issue_key', 'multiple_issue_keys']);
+  assert.equal(preview.totals.missingIssueCount, 1);
+  assert.equal(preview.totals.multipleIssueCount, 1);
+  assert.equal(preview.totals.duplicateCount, 0);
   assert.equal(issueCalls, 0);
+  assert.match(preview.entries[0].worklog.comment, /#lh:[a-f0-9]{8}/);
+  assert.match(preview.summary, /missing ticket 1, multiple tickets 1/);
   assert.match(preview.summary, /Resolve blocked entries/);
 });
 
@@ -70,7 +83,41 @@ test('Jira preview validates issue and blocks duplicate worklogs', async () => {
   assert.equal(preview.status, 'blocked');
   assert.equal(preview.entries[0].status, 'duplicate');
   assert.equal(preview.entries[1].status, 'ready');
+  assert.equal(preview.totals.readyCount, 1);
+  assert.equal(preview.totals.duplicateCount, 1);
+  assert.match(preview.summary, /Issue: Summary SCB-214 \[In Progress\]/);
+  assert.match(preview.summary, /Comment: Fix regression \(SCB-214\) \| #lh:/);
   assert.match(preview.summary, /duplicate_worklog/);
+});
+
+test('Jira preview and apply keep the approved configured worklog payload', async () => {
+  const preview = await previewJiraWorklogBatch({
+    text: `Monday, 01 Jun 2026
++1 Configured time (SCB-213)`,
+    startedTime: '08:30',
+    timezone: 'Asia/Singapore',
+    getSession: async () => fakeSession(),
+    fetchIssue: async (issueKey) => fakeIssue(issueKey),
+    fetchWorklogs: async () => []
+  });
+  let submittedPayload;
+
+  const result = await applyJiraWorklogBatch({
+    batch: preview,
+    confirm: true,
+    getSession: async () => fakeSession(),
+    fetchWorklogs: async () => [],
+    submitWorklog: async (_issueKey, payload) => {
+      submittedPayload = payload;
+      return { id: 'worklog-configured' };
+    }
+  });
+
+  assert.equal(result.status, 'submitted');
+  assert.equal(preview.settings.startedTime, '08:30');
+  assert.equal(preview.settings.timezone, 'Asia/Singapore');
+  assert.equal(submittedPayload.started, '2026-06-01T08:30:00.000+0800');
+  assert.equal(submittedPayload.comment, preview.entries[0].worklog.comment);
 });
 
 test('findDuplicateWorklog matches short marker, legacy marker, or same date seconds and task comment', () => {
@@ -153,6 +200,27 @@ test('Jira apply submits ready entries and stops on API failure', async () => {
   assert.match(result.summary, /failed 1/);
 });
 
+test('Jira apply records submitted and failed entries in the Both flow ledger', async () => {
+  const ledgerCalls = [];
+  const result = await applyJiraWorklogBatch({
+    batch: readyBatch(),
+    confirm: true,
+    ledgerContext: { flowTarget: 'both' },
+    getSession: async () => fakeSession(),
+    fetchWorklogs: async () => [],
+    submitWorklog: async () => ({ id: 'worklog' }),
+    recordLedger: async (record) => {
+      ledgerCalls.push(record);
+      return { id: 'ledger-jira' };
+    }
+  });
+
+  assert.equal(result.ledger.recordId, 'ledger-jira');
+  assert.equal(ledgerCalls[0].target, 'jira');
+  assert.equal(ledgerCalls[0].flowTarget, 'both');
+  assert.deepEqual(ledgerCalls[0].entries.map((entry) => entry.status), ['submitted', 'submitted']);
+});
+
 test('Jira apply requires explicit confirm true', async () => {
   await assert.rejects(() => applyJiraWorklogBatch({
     batch: readyBatch(),
@@ -203,6 +271,10 @@ function fakeIssue(issueKey) {
     key: issueKey,
     summary: `Summary ${issueKey}`,
     status: 'In Progress',
-    issueType: 'Task'
+    issueType: 'Task',
+    project: {
+      key: issueKey.split('-')[0],
+      name: 'Course Builder'
+    }
   };
 }

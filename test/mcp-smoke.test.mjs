@@ -40,13 +40,20 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.deepEqual(names, [
       'apply_jira_worklog_batch',
       'apply_logwork_batch',
+      'apply_update',
+      'check_for_updates',
+      'configure_logwork_reminder',
       'get_jira_issue',
+      'get_logwork_reminder',
       'list_logwork_projects',
       'preview_jira_worklog_batch',
       'preview_logwork_batch',
+      'query_apply_history',
       'query_logwork',
+      'reconcile_logwork',
       'start_auth_login',
       'start_jira_auth',
+      'test_logwork_reminder',
       'upsert_project_mapping'
     ]);
     const applyTool = result.tools.find((tool) => tool.name === 'apply_logwork_batch');
@@ -62,6 +69,36 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.equal(queryTool.inputSchema.properties.date, undefined);
     assert.equal(queryTool.inputSchema.properties.from, undefined);
     assert.equal(queryTool.inputSchema.properties.to, undefined);
+    const reconciliationTool = result.tools.find((tool) => tool.name === 'reconcile_logwork');
+    assert.match(reconciliationTool.description, /Read-only/);
+    assert.deepEqual(reconciliationTool.inputSchema.properties.period.enum, ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month']);
+    assert.equal(reconciliationTool.inputSchema.properties.date, undefined);
+    assert.equal(reconciliationTool.inputSchema.properties.from, undefined);
+    assert.equal(reconciliationTool.inputSchema.properties.to, undefined);
+    assert.equal(reconciliationTool.inputSchema.properties.confirm, undefined);
+    assert.equal(reconciliationTool.inputSchema.properties.token, undefined);
+    const historyTool = result.tools.find((tool) => tool.name === 'query_apply_history');
+    assert.deepEqual(historyTool.inputSchema.properties.target.enum, ['ro', 'jira', 'both']);
+    assert.equal(historyTool.inputSchema.properties.token, undefined);
+    const updateCheckTool = result.tools.find((tool) => tool.name === 'check_for_updates');
+    assert.deepEqual(Object.keys(updateCheckTool.inputSchema.properties), ['force']);
+    const applyUpdateTool = result.tools.find((tool) => tool.name === 'apply_update');
+    assert.deepEqual(Object.keys(applyUpdateTool.inputSchema.properties).sort(), ['confirm', 'version']);
+    assert.equal(applyUpdateTool.inputSchema.properties.confirm.type, 'boolean');
+    assert.equal(applyUpdateTool.inputSchema.properties.command, undefined);
+    assert.equal(applyUpdateTool.inputSchema.properties.registry, undefined);
+    assert.equal(applyUpdateTool.inputSchema.properties.token, undefined);
+    const reminderStatusTool = result.tools.find((tool) => tool.name === 'get_logwork_reminder');
+    assert.deepEqual(reminderStatusTool.inputSchema.properties, {});
+    const reminderConfigTool = result.tools.find((tool) => tool.name === 'configure_logwork_reminder');
+    assert.deepEqual(reminderConfigTool.inputSchema.properties.action.enum, ['enable', 'disable']);
+    assert.deepEqual(reminderConfigTool.inputSchema.properties.target.enum, ['ro', 'jira', 'both']);
+    assert.equal(reminderConfigTool.inputSchema.properties.confirm.type, 'boolean');
+    assert.equal(reminderConfigTool.inputSchema.properties.command, undefined);
+    assert.equal(reminderConfigTool.inputSchema.properties.path, undefined);
+    assert.equal(reminderConfigTool.inputSchema.properties.token, undefined);
+    const reminderTestTool = result.tools.find((tool) => tool.name === 'test_logwork_reminder');
+    assert.deepEqual(Object.keys(reminderTestTool.inputSchema.properties).sort(), ['confirm', 'target']);
     const authTool = result.tools.find((tool) => tool.name === 'start_auth_login');
     assert.deepEqual(authTool.inputSchema.properties, {});
     assert.equal(authTool.inputSchema.properties.password, undefined);
@@ -92,6 +129,26 @@ test('MCP server lists logwork tools over stdio', async () => {
     });
     assert.notEqual(preview.isError, true);
     assert.match(preview.content[0].text, /parse errors/);
+
+    const rejectedUpdate = await client.callTool({
+      name: 'apply_update',
+      arguments: {
+        version: '0.1.11',
+        confirm: false
+      }
+    });
+    assert.equal(rejectedUpdate.isError, true);
+    assert.match(rejectedUpdate.content[0].text, /requires confirm: true/);
+
+    const rejectedReminder = await client.callTool({
+      name: 'configure_logwork_reminder',
+      arguments: {
+        action: 'enable',
+        confirm: false
+      }
+    });
+    assert.equal(rejectedReminder.isError, true);
+    assert.match(rejectedReminder.content[0].text, /requires confirm: true/);
   } finally {
     await client.close();
   }

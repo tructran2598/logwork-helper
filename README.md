@@ -6,7 +6,7 @@
 
 Local MCP server and terminal CLI for Resource Optimiser logwork and Jira self-hosted worklogs.
 
-Logwork Helper lets Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, Claude Code, and other MCP clients work with Resource Optimiser from your machine. It can query logged work, preview and submit approved Resource Optimiser logwork, preview and submit approved Jira worklogs, map ticket prefixes to Resource Optimiser projects, and run a guided terminal flow through `logwork`.
+Logwork Helper lets Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, Claude Code, and other MCP clients work with Resource Optimiser from your machine. It can query logged work, reconcile RO and Jira by day, preview and submit approved Resource Optimiser logwork, preview and submit approved Jira worklogs, map ticket prefixes to Resource Optimiser projects, keep a sanitized local apply history, schedule native OS reminders, and run a guided terminal flow through `logwork`.
 
 Credentials stay local. Resource Optimiser passwords and 2FA codes, and Jira Personal Access Tokens, are entered in Terminal only, never in MCP config or AI chat.
 
@@ -31,6 +31,22 @@ logwork-helper setup-user
 ```
 
 This creates the local Logwork Helper runtime (`~/.logwork-helper` on macOS, `%USERPROFILE%\.logwork-helper` on Windows), installs runtime dependencies there, links the terminal commands, and prints copy-ready MCP config snippets using your real local path.
+
+## Update
+
+Check npm for a newer release:
+
+```bash
+logwork-helper update check
+```
+
+Install the latest release after an interactive confirmation:
+
+```bash
+logwork-helper update install
+```
+
+The `logwork` terminal UI also shows a short notice when a newer release is available. Checks are cached for 24 hours and network errors never block logwork. Updating preserves OS credentials, project mappings, drafts, and apply history. Restart the terminal session and reconnect MCP clients after an update.
 
 ## Authenticate
 
@@ -101,6 +117,45 @@ You can also jump directly:
 
 After saving the config, restart or reload your IDE MCP tools.
 
+MCP assistants can use `check_for_updates`, then call `apply_update` only after showing the exact version and receiving explicit approval. A successful MCP update requires reconnecting the MCP server.
+
+## Reminder
+
+Enable a smart native notification at 17:30, Monday-Friday:
+
+```bash
+logwork-helper reminder enable
+```
+
+Test and inspect it:
+
+```bash
+logwork-helper reminder test
+logwork-helper reminder status
+```
+
+The default target is Both. Resource Optimiser compares today's logged and booked hours; Jira checks whether the current user has any worklog today. Complete days stay silent. macOS uses a user `launchd` agent and Windows uses Task Scheduler; neither schedule stores credentials.
+
+Customize or disable it:
+
+```bash
+logwork-helper reminder enable --time 18:00 --target ro
+logwork-helper reminder disable
+```
+
+## Reconcile RO And Jira
+
+Compare Resource Optimiser and Jira without writing either system:
+
+```bash
+logwork-helper reconcile this-week
+logwork-helper reconcile last-month --json
+```
+
+The report shows booked, RO, and Jira hours by day. It also flags daily or issue-level mismatches. A correction suggestion is included only when an RO task contains exactly one Jira issue key; applying a suggestion still requires the normal target-specific preview and approval flow.
+
+Inside `logwork`, run `/reconcile` to pick a period or use `/reconcile this-week` directly. MCP clients can call the read-only `reconcile_logwork` tool.
+
 Verify from your assistant:
 
 ```text
@@ -150,6 +205,8 @@ Useful terminal commands:
 /query last-week
 /query this-month
 /query last-month
+/reconcile
+/reconcile this-week
 /logwork
 /logwork ro
 /logwork jira
@@ -158,6 +215,7 @@ Useful terminal commands:
 /projects
 /projects 5234
 /map SCB 5234
+/history
 /diagnostics
 ```
 
@@ -166,6 +224,7 @@ Useful terminal commands:
 - [MCP setup](docs/mcp-setup.md): full client configs, exposed tools, verification prompts, and common MCP workflows.
 - [Security and auth](docs/security.md): Keycloak flow, Jira PAT flow, OS credential storage, stored files, and safety model.
 - [Advanced usage](docs/advanced.md): environment overrides, manual REPL details, updates, troubleshooting, legacy git hook, and release checks.
+- [Quick recipes](docs/recipes.md): copy-ready RO, Jira, Both, auth recovery, duplicate handling, mapping, and history workflows.
 - [Release checklist](RELEASE.md): publish and manual verification checklist.
 
 ## License

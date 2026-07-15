@@ -125,6 +125,31 @@ Manual drafts:
 ~/.logwork-helper/manual-drafts.json
 ```
 
+Sanitized apply ledger:
+
+```text
+~/.logwork-helper/apply-ledger.json
+```
+
+The apply ledger stores target, flow target, batch ID, timestamp, workspace path, entry metadata, and submitted/failed/blocked status. It does not store credentials, cookies, or raw API responses, and token-like error text is redacted before writing.
+
+Update check cache:
+
+```text
+~/.logwork-helper/update-state.json
+```
+
+The update cache stores only the package name, latest SemVer, and check timestamp. It expires after 24 hours and contains no npm credentials.
+
+Reminder configuration and last-run state:
+
+```text
+~/.logwork-helper/reminder.json
+~/.logwork-helper/reminder-state.json
+```
+
+Reminder config stores only enabled state, local time, target, and weekdays. Reminder state stores sanitized timestamps and status summaries. The macOS launch agent and Windows scheduled task contain only fixed Node/script paths and never contain RO tokens, Jira PATs, passwords, or API responses.
+
 Diagnostics reports:
 
 ```text
@@ -140,5 +165,10 @@ Diagnostics reports:
 - MCP writes Jira worklogs only after an assistant calls `apply_jira_worklog_batch` with explicit confirmation and a cached Jira preview `batchId`.
 - Resource Optimiser apply and Jira worklog apply are separate flows. Applying Resource Optimiser logwork does not automatically write Jira worklogs.
 - Jira duplicate detection is blocking and has no override option in v1.
-- `query_logwork` and `list_logwork_projects` are read-only.
+- `query_logwork`, `reconcile_logwork`, `query_apply_history`, and `list_logwork_projects` are read-only.
+- Reconciliation accepts preset periods only, filters Jira worklogs to the stored Jira user, and never applies its correction suggestions directly.
+- `check_for_updates` is read-only. `apply_update` requires `confirm: true`, re-checks npm latest, accepts only exact SemVer, and cannot receive an arbitrary registry or shell command.
+- Update installation preserves local files and OS credential-store entries. The current MCP process must be reconnected after a successful update.
+- `get_logwork_reminder` is read-only. `configure_logwork_reminder` and `test_logwork_reminder` require `confirm: true` and do not accept arbitrary scheduler commands, paths, JQL, or credentials.
+- The background reminder reads RO/Jira sessions from the OS credential store only when it runs. Notification and state text are sanitized and never include raw API responses.
 - Diagnostics reports redact tokens, cookies, passwords, OTPs, auth codes, and raw HTML.

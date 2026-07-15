@@ -15,6 +15,7 @@ import {
   userConfigPath
 } from '../lib/paths.mjs';
 import {
+  enrichRoPreviewWithJiraProjects,
   listLogworkProjects,
   upsertProjectMapping
 } from '../lib/project-mapping-workflow.mjs';
@@ -155,6 +156,64 @@ test('listLogworkProjects returns memberships and current mappings', async () =>
   assert.equal(result.configSources.user, join(home, '.logwork-helper.json'));
   assert.equal(result.configSources.project, join(cwd, '.logwork-helper.json'));
   assert.match(result.summary, /Found 1 Resource Optimiser project memberships/);
+});
+
+test('Both preview ranks Jira project matches as explicit RO mapping suggestions', () => {
+  const roPreview = {
+    summary: 'RO preview unresolved.',
+    setupSuggestions: [
+      {
+        entryId: '2026-06-01-01',
+        ticketPrefixes: ['SCB'],
+        candidateProjects: [
+          {
+            projectMemberId: 5234,
+            projectId: 643,
+            projectName: '2621A-SIT-HTML BUILDER-PRJ',
+            toolArguments: {
+              projectMemberId: 5234,
+              tickets: ['SCB'],
+              keywords: [],
+              confirm: true
+            }
+          },
+          {
+            projectMemberId: 9000,
+            projectId: 900,
+            projectName: 'Internal Operations',
+            toolArguments: {
+              projectMemberId: 9000,
+              tickets: ['SCB'],
+              keywords: [],
+              confirm: true
+            }
+          }
+        ]
+      }
+    ]
+  };
+  const jiraPreview = {
+    entries: [
+      {
+        id: '2026-06-01-01',
+        issueKey: 'SCB-213',
+        issue: {
+          project: {
+            key: 'SCB',
+            name: 'HTML Builder'
+          }
+        }
+      }
+    ]
+  };
+
+  const enriched = enrichRoPreviewWithJiraProjects(roPreview, jiraPreview);
+
+  assert.equal(enriched.jiraMappingSuggestions.length, 1);
+  assert.equal(enriched.jiraMappingSuggestions[0].recommendation.projectMemberId, 5234);
+  assert.equal(enriched.jiraMappingSuggestions[0].recommendation.reason, 'jira_project_name_contains');
+  assert.match(enriched.summary, /Jira-assisted RO mapping suggestions/);
+  assert.match(enriched.summary, /Confirm with \/map SCB 5234/);
 });
 
 test('upsertProjectMapping can write project scoped mapping explicitly', async () => {

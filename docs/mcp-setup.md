@@ -102,6 +102,13 @@ Or add this to project `.mcp.json`:
 After editing config, restart or reload the IDE. The MCP server should expose:
 
 - `query_logwork`
+- `reconcile_logwork`
+- `query_apply_history`
+- `check_for_updates`
+- `apply_update`
+- `get_logwork_reminder`
+- `configure_logwork_reminder`
+- `test_logwork_reminder`
 - `preview_logwork_batch`
 - `apply_logwork_batch`
 - `list_logwork_projects`
@@ -188,6 +195,18 @@ Summarize my logwork for this month.
 
 The assistant should call `query_logwork`. This is read-only and does not need confirmation.
 
+### Reconcile Resource Optimiser And Jira
+
+Ask:
+
+```text
+Compare my Resource Optimiser and Jira worklogs for this week. Show daily differences and do not write anything.
+```
+
+The assistant should call `reconcile_logwork` with `period: "this_week"`. Supported periods are `today`, `yesterday`, `this_week`, `last_week`, `this_month`, and `last_month`; custom dates are intentionally not exposed.
+
+The tool is read-only. It returns daily booked/RO/Jira totals, issue-level differences, entries that cannot be verified because they lack exactly one Jira key, and high-confidence correction suggestions. A suggestion is not an approved write. The assistant must use the existing target-specific preview tool and ask for approval before calling the matching apply tool.
+
 ### Preview Then Apply Resource Optimiser
 
 Use weekly text like this:
@@ -232,7 +251,7 @@ Tuesday, 02 Jun 2026
 Expected flow:
 
 1. Assistant calls `preview_jira_worklog_batch`.
-2. Assistant shows ready, unresolved, and duplicate entries, then asks for approval.
+2. Assistant shows ready, duplicate, missing-ticket, multi-ticket, and lookup-failed counts; issue summary/status; and the final `started` and comment values, then asks for approval.
 3. Assistant calls `apply_jira_worklog_batch` with the returned `batchId` only after you approve.
 
 `apply_jira_worklog_batch` requires `confirm: true` and a cached `batchId` from `preview_jira_worklog_batch`. If the preview expired, changed, has no ticket, has multiple tickets, or detects duplicate Jira worklogs, rerun preview after fixing the text.
@@ -248,6 +267,8 @@ comment: task name plus short helper marker, for example #lh:8f3a91c0
 adjustEstimate: leave
 ```
 
+Override the first two values with `LOGWORK_JIRA_STARTED_TIME=HH:mm` and `LOGWORK_TIMEZONE=<IANA timezone>`. Preview stores the exact payload that apply will submit.
+
 ### Preview Then Apply Both
 
 For the same text, the assistant should run two separate previews:
@@ -261,6 +282,62 @@ The assistant should show both summaries, then request approval separately:
 2. Apply Jira with `apply_jira_worklog_batch` and `confirm: true`.
 
 The two apply steps are intentionally not atomic. A Resource Optimiser apply never writes Jira, and a Jira apply never writes Resource Optimiser.
+
+When an unresolved RO entry has Jira project metadata, the terminal Both flow ranks matching RO memberships and shows a proposed `/map` command. The suggestion never writes config until you explicitly confirm the mapping.
+
+### Query Apply History
+
+Ask your assistant:
+
+```text
+Show my last 10 Jira apply results.
+```
+
+The assistant should call `query_apply_history`. This reads the sanitized local ledger and never returns credentials or raw API responses. Filter `both` returns records created while using the combined Both flow.
+
+### Check And Apply Updates
+
+Ask your assistant:
+
+```text
+Check whether Logwork Helper has a newer version. Do not install it yet.
+```
+
+The assistant should call `check_for_updates` and show the current version, latest version, and release URL. This step is read-only.
+
+To update through MCP:
+
+1. Assistant calls `check_for_updates` and shows the exact target version.
+2. Assistant asks for explicit approval.
+3. Assistant calls `apply_update` with that `version` and `confirm: true`.
+4. After success, restart or reload the IDE MCP connection before using other tools.
+
+`apply_update` re-checks npm immediately before installing. It accepts only npm latest, preserves local state and OS credentials, and does not accept an arbitrary npm registry, package, or shell command.
+
+### Configure Native Reminder
+
+Ask your assistant:
+
+```text
+Show my current logwork reminder configuration. Do not change it.
+```
+
+The assistant calls `get_logwork_reminder`, which is read-only.
+
+To configure it:
+
+```text
+Enable a Both logwork reminder at 17:30 on weekdays. Show the plan and ask before changing my OS schedule.
+```
+
+Expected flow:
+
+1. Assistant explains that macOS uses launchd and Windows uses Task Scheduler.
+2. Assistant asks for explicit approval.
+3. Assistant calls `configure_logwork_reminder` with `action: "enable"`, the approved time/target, and `confirm: true`.
+4. Assistant calls `get_logwork_reminder` to verify config and scheduler consistency.
+
+`test_logwork_reminder` also requires `confirm: true` because it displays a native OS notification. Reminder tools never accept credentials, scheduler commands, executable paths, or arbitrary JQL.
 
 ### Set Up Project Mapping
 

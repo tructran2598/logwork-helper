@@ -63,6 +63,54 @@ Authentication uses a Jira Personal Access Token entered in Terminal. MCP tools 
 Writes a sanitized support report under the local helper diagnostics directory.
 Send only the generated file to developers; do not send raw curl logs, cookies, passwords, OTPs, or tokens.`
   }],
+  ['release', {
+    script: 'release-cli.mjs',
+    description: 'Check release readiness before npm and GitHub publishing.',
+    help: `Usage:
+  logwork-helper release doctor [--full]
+
+Checks version, git state, npm auth, npm latest, GitHub auth, tags, releases, and local release artifacts.
+
+Options:
+  --full    Also run npm test, npm audit, npm pack --dry-run, and git diff --check`
+  }],
+  ['history', {
+    script: 'history-cli.mjs',
+    description: 'Show the local RO/Jira apply result ledger.',
+    help: `Usage:
+  logwork-helper history [--target ro|jira|both] [--limit <count>] [--json]
+
+Shows recent apply outcomes without credentials or raw API responses.
+Target both filters entries that came from the combined Both flow.`
+  }],
+  ['reconcile', {
+    script: 'reconcile-cli.mjs',
+    description: 'Compare Resource Optimiser and Jira worklogs by preset period.',
+    help: `Usage:
+  logwork-helper reconcile [today|yesterday|this-week|last-week|this-month|last-month] [--json]
+
+Read-only comparison of RO and Jira hours by day. High-confidence correction suggestions must still use the existing target-specific preview and approval flow.`
+  }],
+  ['update', {
+    script: 'update-cli.mjs',
+    description: 'Check for and install Logwork Helper updates from npm.',
+    help: `Usage:
+  logwork-helper update check [--force] [--json]
+  logwork-helper update install [--version <semver>] [--yes] [--json]
+
+Checks npm latest with a 24-hour cache. Install accepts only the exact latest SemVer, preserves local state and OS credentials, and requires confirmation.`
+  }],
+  ['reminder', {
+    script: 'reminder-cli.mjs',
+    description: 'Manage native macOS/Windows logwork reminders.',
+    help: `Usage:
+  logwork-helper reminder enable [--time HH:mm] [--target ro|jira|both] [--yes]
+  logwork-helper reminder status [--json]
+  logwork-helper reminder test [--target ro|jira|both] [--yes]
+  logwork-helper reminder disable [--yes]
+
+Schedules a smart Monday-Friday reminder through launchd on macOS or Task Scheduler on Windows.`
+  }],
   ['doctor', {
     script: 'diagnostics-cli.mjs',
     description: 'Alias for diagnostics; write a sanitized setup health report.',
@@ -92,6 +140,8 @@ Commands inside the REPL:
   /query last-week
   /query this-month
   /query last-month
+  /reconcile
+  /reconcile this-week
   /logwork
   /logwork ro
   /logwork jira
@@ -101,6 +151,7 @@ Commands inside the REPL:
   /projects 5234
   /map SCB 5234
   /diagnostics
+  /history
   Press Esc to exit`
   }],
   ['log', {
@@ -183,6 +234,11 @@ function printHelp() {
   logwork-helper setup-user
   logwork-helper auth login
   logwork-helper jira login
+  logwork-helper release doctor --full
+  logwork-helper update check
+  logwork-helper reminder status
+  logwork-helper reconcile this-week
+  logwork-helper history --target jira
   logwork-helper diagnostics
   logwork-helper doctor
   logwork-helper mcp

@@ -6,6 +6,8 @@ const BASE_CONFIG = {
   loginUrl: 'https://app.resourceoptimiser.com/vinova',
   tokenKey: 'vinova_access_token',
   jiraBaseUrl: 'https://jira-vnv.vinova.sg',
+  jiraStartedTime: '09:00',
+  timezone: 'Asia/Ho_Chi_Minh',
 
   projectMembersPath: '/project-members/by-user',
   memberLogtimePath: '/member-logtime',
@@ -53,6 +55,8 @@ export function buildConfig(env = {}) {
     loginUrl: readUrlEnv(env, 'LOGWORK_LOGIN_URL') || BASE_CONFIG.loginUrl,
     tokenKey: readStringEnv(env, 'LOGWORK_TOKEN_KEY') || BASE_CONFIG.tokenKey,
     jiraBaseUrl: readUrlEnv(env, 'LOGWORK_JIRA_BASE_URL') || BASE_CONFIG.jiraBaseUrl,
+    jiraStartedTime: readTimeEnv(env, 'LOGWORK_JIRA_STARTED_TIME') || BASE_CONFIG.jiraStartedTime,
+    timezone: readTimeZoneEnv(env, 'LOGWORK_TIMEZONE') || BASE_CONFIG.timezone,
     keycloakAuthUrl: readUrlEnv(env, 'LOGWORK_KEYCLOAK_AUTH_URL') || BASE_CONFIG.keycloakAuthUrl,
     keycloakTokenUrl: readUrlEnv(env, 'LOGWORK_KEYCLOAK_TOKEN_URL') || BASE_CONFIG.keycloakTokenUrl,
     keycloakClientId: readStringEnv(env, 'LOGWORK_KEYCLOAK_CLIENT_ID') || BASE_CONFIG.keycloakClientId,
@@ -131,6 +135,30 @@ function readNonNegativeIntegerEnv(env, key) {
     throw new Error(`${key} must be a non-negative integer.`);
   }
   return number;
+}
+
+function readTimeEnv(env, key) {
+  const value = readStringEnv(env, key);
+  if (!value) {
+    return null;
+  }
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+    throw new Error(`${key} must use 24-hour HH:mm format.`);
+  }
+  return value;
+}
+
+function readTimeZoneEnv(env, key) {
+  const value = readStringEnv(env, key);
+  if (!value) {
+    return null;
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
+  } catch {
+    throw new Error(`${key} must be a valid IANA timezone.`);
+  }
+  return value;
 }
 
 function hostFromUrl(value, label) {

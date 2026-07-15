@@ -11,6 +11,8 @@ LOGWORK_HELPER_PROFILE=vinova
 LOGWORK_API_BASE=https://api.resourceoptimiser.com/api/v1
 LOGWORK_LOGIN_URL=https://app.resourceoptimiser.com/vinova
 LOGWORK_JIRA_BASE_URL=https://jira-vnv.vinova.sg
+LOGWORK_JIRA_STARTED_TIME=09:00
+LOGWORK_TIMEZONE=Asia/Ho_Chi_Minh
 LOGWORK_KEYCLOAK_AUTH_URL=https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/auth
 LOGWORK_KEYCLOAK_TOKEN_URL=https://keycloak.vinova.sg/auth/realms/resource/protocol/openid-connect/token
 LOGWORK_KEYCLOAK_REDIRECT_URI=https://app.resourceoptimiser.com/vinova/check-login
@@ -25,6 +27,8 @@ LOGWORK_HELPER_PROFILE
 LOGWORK_API_BASE
 LOGWORK_LOGIN_URL
 LOGWORK_JIRA_BASE_URL
+LOGWORK_JIRA_STARTED_TIME
+LOGWORK_TIMEZONE
 LOGWORK_TOKEN_KEY
 LOGWORK_ALLOWED_SAFARI_HOSTS
 LOGWORK_KEYCLOAK_AUTH_URL
@@ -74,20 +78,106 @@ Use `--no-login` when installing in scripts or CI.
 
 ## Update
 
-For global npm users:
+Check the currently running version against npm latest:
+
+```bash
+logwork-helper update check
+```
+
+Force a registry check instead of using the 24-hour cache:
+
+```bash
+logwork-helper update check --force
+```
+
+Install npm latest after an interactive confirmation:
+
+```bash
+logwork-helper update install
+```
+
+For scripts, pass `--yes`. To double-check an announced release before installation, pass its exact SemVer:
+
+```bash
+logwork-helper update install --version 0.1.11 --yes
+```
+
+The installer accepts only the version currently published under npm's `latest` tag. It invokes npm with a fixed package and argument list, copies the new runtime to `~/.logwork-helper`, and verifies the copied `package.json` version. Project mappings, drafts, apply history, update cache, and OS credential-store records are preserved.
+
+The `logwork` terminal UI performs a cached check at startup and shows a one-line notice when an update exists. Registry failures are ignored in this startup path so offline use remains available.
+
+MCP exposes `check_for_updates` and `apply_update`. `apply_update` requires `confirm: true`, does not accept a registry or arbitrary command, and performs a fresh npm check immediately before installation. Restart the terminal session and reconnect or reload the IDE MCP server after updating.
+
+The previous manual update remains available as a recovery path:
 
 ```bash
 npm update -g logwork-helper
 logwork-helper setup-user --no-login
 ```
 
-For `npx` users:
+## Native Logwork Reminder
+
+Enable the default weekday reminder:
 
 ```bash
-npx -y logwork-helper setup-user --no-login
+logwork-helper reminder enable
 ```
 
-Restart or reload your IDE after updating.
+Defaults:
+
+- Local OS time `17:30`.
+- Monday-Friday.
+- Target `both`.
+- At most one notification per day.
+- No notification when all enabled checks are complete.
+
+Customize the time or target:
+
+```bash
+logwork-helper reminder enable --time 18:00 --target ro
+logwork-helper reminder enable --time 17:45 --target jira
+```
+
+Inspect, test, or remove the reminder:
+
+```bash
+logwork-helper reminder status
+logwork-helper reminder test
+logwork-helper reminder disable
+```
+
+On macOS the helper writes `~/Library/LaunchAgents/sg.vinova.logwork-helper.reminder.plist` and loads it with `launchctl`. On Windows it creates the interactive user task `Logwork Helper Reminder` with `schtasks.exe`. Both schedulers run the stable `~/.logwork-helper/reminder-cli.mjs run` entrypoint, which reads credentials from macOS Keychain or Windows Credential Manager at execution time.
+
+Resource Optimiser is incomplete when today's logged hours are lower than booked hours. A day with no RO bookings and no RO logs is treated as not expected. Jira is incomplete when JQL finds no issue with a worklog by `currentUser()` on today's date. Auth or check failures produce an actionable notification without including the underlying API response.
+
+The `test` command sends a sample notification immediately and does not query or write RO/Jira. On macOS, allow notifications when prompted. On Windows, ensure app notifications are enabled for PowerShell because the lightweight WinRT toast is delivered through the built-in PowerShell host.
+
+## Reconcile Resource Optimiser And Jira
+
+Use the same preset periods as `/query`:
+
+```bash
+logwork-helper reconcile today
+logwork-helper reconcile this-week
+logwork-helper reconcile last-week --json
+```
+
+The command queries RO task details and Jira worklogs authored by the authenticated Jira user. Jira issues are discovered with an exclusive date-range JQL query, then each issue's worklogs are filtered again by author and started date. The result includes booked, RO, and Jira hours by day; total and issue-level differences; missing task-detail diagnostics; and high-confidence correction suggestions.
+
+A suggestion is high confidence only when an RO entry contains exactly one issue key such as `SCB-213`. Jira-to-RO suggestions still require project resolution. Reconciliation is read-only and never calls either apply workflow.
+
+Inside the terminal UI, `/reconcile` opens a period picker. Direct commands are also available:
+
+```text
+/reconcile today
+/reconcile yesterday
+/reconcile this-week
+/reconcile last-week
+/reconcile this-month
+/reconcile last-month
+```
+
+MCP exposes the same workflow as `reconcile_logwork`. To correct a mismatch, create a normal `preview_logwork_batch` or `preview_jira_worklog_batch`, inspect it, and apply the target separately after approval.
 
 ## Manual Terminal REPL
 
@@ -129,6 +219,8 @@ Useful commands inside the session:
 /query last-week
 /query this-month
 /query last-month
+/reconcile
+/reconcile this-week
 /logwork
 /logwork ro
 /logwork jira
@@ -137,6 +229,7 @@ Useful commands inside the session:
 /projects
 /projects 5234
 /map SCB 5234
+/history
 /diagnostics
 ```
 
@@ -172,6 +265,16 @@ While the `task >` prompt is active, type `/` to see task-only actions:
 ```
 
 Resource Optimiser drafts saved with `/save` are stored locally at `~/.logwork-helper/manual-drafts.json` on macOS or `%USERPROFILE%\.logwork-helper\manual-drafts.json` on Windows. Drafts never contain tokens, passwords, or OTPs.
+
+Successful, partial, failed, and blocked apply outcomes are recorded in `~/.logwork-helper/apply-ledger.json`. The ledger contains only sanitized batch, entry, project, issue, status, and timestamp metadata. Read it with:
+
+```bash
+logwork-helper history
+logwork-helper history --target jira --limit 10
+logwork-helper history --target both
+```
+
+Inside `logwork`, use `/history`, `/history ro`, `/history jira`, or `/history both`. The `both` filter means records created while using the combined Both flow.
 
 ## Troubleshooting
 
@@ -226,10 +329,11 @@ $env:LOGWORK_DRY_RUN = "1"; logwork-helper manual quick --message "Dry run task"
 Before publishing or tagging a release, run:
 
 ```bash
+logwork-helper release doctor --full
 npm run release:check
 ```
 
-This runs tests, production dependency audit, package dry run, and whitespace checks. See [RELEASE.md](../RELEASE.md) for the full checklist and manual verification steps.
+The release doctor checks version consistency, git state, npm/GitHub auth, npm latest, tag/release state, local tarball artifacts, tests, audit, package dry run, and whitespace checks. See [RELEASE.md](../RELEASE.md) for the full checklist and manual verification steps.
 
 ## GitHub About Metadata
 

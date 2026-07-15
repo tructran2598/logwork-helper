@@ -7,5 +7,9 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
-obsidian/
+obsidian/**
+!obsidian/**/
+!obsidian/*.md
+!obsidian/**/*.md
+obsidian/Untitled.md
 *.tgz

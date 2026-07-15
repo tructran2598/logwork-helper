@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { CONFIG } from './config.mjs';
 import { isMainModule } from './lib/entrypoint.mjs';
 import { runManualRepl } from './lib/manual-repl.mjs';
+import { checkForUpdates, formatUpdateNotice } from './lib/update-service.mjs';
 import { safeJsonParse, nowIso } from './lib/util.mjs';
 
 const helperDir = dirname(fileURLToPath(import.meta.url));
@@ -20,13 +21,25 @@ async function main() {
   }
 
   if (mode === 'repl') {
+    const updateNotice = process.stdin.isTTY && process.stdout.isTTY
+      ? await getStartupUpdateNotice()
+      : '';
     await runManualRepl({
-      cwd: resolve(process.cwd())
+      cwd: resolve(process.cwd()),
+      updateNotice
     });
     return;
   }
 
   await runQuickManual({ message });
+}
+
+export async function getStartupUpdateNotice({ checkForUpdatesFn = checkForUpdates } = {}) {
+  try {
+    return formatUpdateNotice(await checkForUpdatesFn());
+  } catch {
+    return '';
+  }
 }
 
 export async function runQuickManual({ message = '' } = {}) {
@@ -207,6 +220,10 @@ REPL commands:
   /projects
   /projects 5234
   /map SCB 5234
+
+Updates:
+  logwork-helper update check
+  logwork-helper update install
 
 Press Esc to exit the manual CLI.
 `);
