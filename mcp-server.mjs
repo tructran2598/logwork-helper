@@ -165,7 +165,7 @@ server.registerTool('configure_logwork_reminder', {
   description: 'Enable or disable the native OS logwork reminder after explicit approval. Uses launchd on macOS and Task Scheduler on Windows; no credentials are stored in the schedule.',
   inputSchema: {
     action: z.enum(['enable', 'disable']).describe('Whether to install/update or remove the OS reminder schedule.'),
-    time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().describe('Local OS time in 24-hour HH:mm format. Defaults to 17:30.'),
+    time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().describe('Local OS time in 24-hour HH:mm format. Defaults to 17:00.'),
     target: z.enum(['ro', 'jira', 'both']).optional().describe('Reminder target. Defaults to both.'),
     confirm: z.boolean().describe('Must be true after explicit user approval.')
   }

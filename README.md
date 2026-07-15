@@ -121,7 +121,7 @@ MCP assistants can use `check_for_updates`, then call `apply_update` only after 
 
 ## Reminder
 
-Enable a smart native notification at 17:30, Monday-Friday:
+Enable a smart native notification at 17:00, Monday-Friday:
 
 ```bash
 logwork-helper reminder enable
@@ -221,6 +221,7 @@ Useful terminal commands:
 
 ## More Docs
 
+- [Integrated operations guide](docs/operations-guide.md): complete CLI/MCP feature matrix, RO/Jira/Both processing examples, mapping, reconciliation, history, reminders, updates, release flow, and OS validation.
 - [MCP setup](docs/mcp-setup.md): full client configs, exposed tools, verification prompts, and common MCP workflows.
 - [Security and auth](docs/security.md): Keycloak flow, Jira PAT flow, OS credential storage, stored files, and safety model.
 - [Advanced usage](docs/advanced.md): environment overrides, manual REPL details, updates, troubleshooting, legacy git hook, and release checks.

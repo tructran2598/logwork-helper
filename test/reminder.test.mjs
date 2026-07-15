@@ -38,10 +38,10 @@ import {
 } from '../lib/os-notification.mjs';
 import { parseReminderArgs, runReminderCli } from '../reminder-cli.mjs';
 
-test('reminder config defaults to weekdays at 17:30 for both targets', async () => {
+test('reminder config defaults to weekdays at 17:00 for both targets', async () => {
   assert.deepEqual(defaultReminderConfig(), {
     enabled: false,
-    time: '17:30',
+    time: '17:00',
     target: 'both',
     days: [1, 2, 3, 4, 5]
   });
@@ -77,7 +77,7 @@ test('reminder state is local, sanitized, and redacts token-shaped errors', asyn
 
 test('macOS reminder plist schedules configured weekdays with stable runner paths', () => {
   const plist = buildMacosReminderPlist({
-    config: { enabled: true, time: '17:30', target: 'both', days: [1, 2, 3, 4, 5] },
+    config: { enabled: true, time: '17:00', target: 'both', days: [1, 2, 3, 4, 5] },
     nodePath: '/opt/homebrew/bin/node',
     runnerPath: '/Users/test/.logwork-helper/reminder-cli.mjs',
     home: '/Users/test/.logwork-helper'
@@ -85,14 +85,14 @@ test('macOS reminder plist schedules configured weekdays with stable runner path
   assert.match(plist, /sg\.vinova\.logwork-helper\.reminder/);
   assert.equal((plist.match(/<key>Weekday<\/key>/g) || []).length, 5);
   assert.match(plist, /<key>Hour<\/key><integer>17<\/integer>/);
-  assert.match(plist, /<key>Minute<\/key><integer>30<\/integer>/);
+  assert.match(plist, /<key>Minute<\/key><integer>0<\/integer>/);
   assert.match(plist, /reminder-cli\.mjs/);
   assert.match(plist, /--home/);
 });
 
 test('Windows reminder task uses weekly weekdays and a fixed Node runner action', () => {
   const args = buildWindowsReminderCreateArgs({
-    config: { enabled: true, time: '17:30', target: 'both', days: [1, 2, 3, 4, 5] },
+    config: { enabled: true, time: '17:00', target: 'both', days: [1, 2, 3, 4, 5] },
     nodePath: 'C:\\Program Files\\nodejs\\node.exe',
     runnerPath: 'C:\\Users\\test\\.logwork-helper\\reminder-cli.mjs',
     home: 'C:\\Users\\test\\.logwork-helper'
@@ -102,7 +102,7 @@ test('Windows reminder task uses weekly weekdays and a fixed Node runner action'
   assert.match(args[4], /reminder-cli\.mjs/);
   assert.equal(args[args.indexOf('/SC') + 1], 'WEEKLY');
   assert.equal(args[args.indexOf('/D') + 1], 'MON,TUE,WED,THU,FRI');
-  assert.equal(args[args.indexOf('/ST') + 1], '17:30');
+  assert.equal(args[args.indexOf('/ST') + 1], '17:00');
   assert.ok(args.includes('/IT'));
   assert.ok(args.includes('/F'));
 });
@@ -112,7 +112,7 @@ test('scheduler installation tolerates missing old macOS job and requires bootst
   let writtenPath;
   const result = await installReminderScheduler({
     enabled: true,
-    time: '17:30',
+    time: '17:00',
     target: 'both',
     days: [1, 2, 3, 4, 5]
   }, {
@@ -248,7 +248,7 @@ test('scheduled reminder notifies once per day and persists sanitized status', a
   const notifications = [];
   const now = () => new Date(2026, 6, 15, 17, 30, 0);
   const baseOptions = {
-    loadConfig: async () => ({ enabled: true, time: '17:30', target: 'both', days: [1, 2, 3, 4, 5] }),
+    loadConfig: async () => ({ enabled: true, time: '17:00', target: 'both', days: [1, 2, 3, 4, 5] }),
     loadState: async () => null,
     saveState: async (state) => { states.push(state); },
     check: async () => ({
@@ -276,14 +276,14 @@ test('scheduled reminder notifies once per day and persists sanitized status', a
 
 test('scheduled reminder skips disabled config and non-workdays', async () => {
   const disabled = await runScheduledReminder({
-    loadConfig: async () => ({ enabled: false, time: '17:30', target: 'both', days: [1, 2, 3, 4, 5] }),
+    loadConfig: async () => ({ enabled: false, time: '17:00', target: 'both', days: [1, 2, 3, 4, 5] }),
     statePath: join(await mkdtemp(join(tmpdir(), 'logwork-reminder-disabled-')), 'state.json')
   });
   assert.equal(disabled.status, 'disabled');
 
   let saved;
   const weekend = await runScheduledReminder({
-    loadConfig: async () => ({ enabled: true, time: '17:30', target: 'both', days: [1, 2, 3, 4, 5] }),
+    loadConfig: async () => ({ enabled: true, time: '17:00', target: 'both', days: [1, 2, 3, 4, 5] }),
     saveState: async (state) => { saved = state; },
     now: () => new Date(2026, 6, 18, 17, 30, 0),
     statePath: join(await mkdtemp(join(tmpdir(), 'logwork-reminder-weekend-')), 'state.json')

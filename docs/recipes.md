@@ -166,7 +166,7 @@ After approval, the assistant calls `apply_update` with the exact version and `c
 
 ## Enable A Native Weekday Reminder
 
-Default Both reminder at 17:30:
+Default Both reminder at 17:00:
 
 ```bash
 logwork-helper reminder enable
@@ -188,7 +188,7 @@ logwork-helper reminder status
 MCP prompt:
 
 ```text
-Enable a Both logwork reminder at 17:30 on weekdays. Explain the OS schedule and ask for approval before changing anything.
+Enable a Both logwork reminder at 17:00 on weekdays. Explain the OS schedule and ask for approval before changing anything.
 ```
 
 The notification remains silent when enabled checks are complete. Disable and remove the OS schedule with `logwork-helper reminder disable`.

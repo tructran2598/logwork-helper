@@ -115,7 +115,7 @@ export async function runReminderCli(args = [], {
   }
 
   const actionLabel = options.command === 'enable'
-    ? `Enable ${options.target || 'both'} logwork reminder at ${options.time || '17:30'}, Monday-Friday?`
+    ? `Enable ${options.target || 'both'} logwork reminder at ${options.time || '17:00'}, Monday-Friday?`
     : options.command === 'disable'
       ? 'Disable the logwork reminder and remove its OS schedule?'
       : `Send a ${options.target || 'configured'} test notification now?`;
@@ -155,7 +155,7 @@ export function formatReminderHelp() {
   logwork-helper reminder test [--target ro|jira|both] [--yes]
   logwork-helper reminder disable [--yes]
 
-The reminder runs Monday-Friday at 17:30 by default. It uses launchd on macOS and Task Scheduler on Windows. RO compares logged and booked hours; Jira checks whether the current user has a worklog today.`;
+The reminder runs Monday-Friday at 17:00 by default. It uses launchd on macOS and Task Scheduler on Windows. RO compares logged and booked hours; Jira checks whether the current user has a worklog today.`;
 }
 
 async function requireInteractiveConfirmation({ isTTY, promptConfirm, message }) {

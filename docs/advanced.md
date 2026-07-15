@@ -2,6 +2,8 @@
 
 This file keeps technical details out of the main README. Most users only need `npm install -g logwork-helper`, `logwork-helper setup-user --no-login`, `logwork-helper auth login`, and `/mcp`.
 
+For one consolidated reference covering all newly integrated CLI and MCP workflows, see the [integrated operations guide](operations-guide.md).
+
 ## Environment Configuration
 
 Defaults target the current Resource Optimiser / Vinova profile. For non-default deployments, configure the runtime with environment variables instead of editing source:
@@ -125,7 +127,7 @@ logwork-helper reminder enable
 
 Defaults:
 
-- Local OS time `17:30`.
+- Local OS time `17:00`.
 - Monday-Friday.
 - Target `both`.
 - At most one notification per day.

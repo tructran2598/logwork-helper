@@ -2,6 +2,8 @@
 
 Use `/mcp` inside the `logwork` terminal UI when possible. It prints copy-ready config with your actual `mcp-server.mjs` path.
 
+For the full RO/Jira/Both processing model, output examples, mapping behavior, reconciliation, history, reminders, and update flow, see the [integrated operations guide](operations-guide.md).
+
 ```bash
 logwork
 ```
@@ -327,7 +329,7 @@ The assistant calls `get_logwork_reminder`, which is read-only.
 To configure it:
 
 ```text
-Enable a Both logwork reminder at 17:30 on weekdays. Show the plan and ask before changing my OS schedule.
+Enable a Both logwork reminder at 17:00 on weekdays. Show the plan and ask before changing my OS schedule.
 ```
 
 Expected flow:

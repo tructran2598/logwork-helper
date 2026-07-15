@@ -2,6 +2,37 @@
 
 Use this checklist before publishing or tagging a production release.
 
+The complete end-user update and maintainer publish flows are documented in the [integrated operations guide](docs/operations-guide.md).
+
+## Version And Publish Sequence
+
+Bump `package.json` and `package-lock.json` together:
+
+```bash
+npm version patch --no-git-tag-version
+npm run release:check
+```
+
+Commit and sync the version before running the release doctor, because the doctor requires a clean, synchronized `main` branch:
+
+```bash
+git add package.json package-lock.json
+git commit -m "bump version to <version>"
+git push origin main
+logwork-helper release doctor --full
+```
+
+After the doctor passes, publish npm and create the matching GitHub release:
+
+```bash
+npm publish --access public
+git tag v<version>
+git push origin v<version>
+gh release create v<version> --generate-notes --title "v<version>"
+```
+
+Use `minor` or `major` instead of `patch` when required by SemVer. Never reuse an already published version.
+
 ## Required Gates
 
 Run the local release gate:
