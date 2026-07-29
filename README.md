@@ -15,7 +15,7 @@ Credentials stay local. Resource Optimiser passwords and 2FA codes, and Jira Per
 Requirements:
 
 - macOS or Windows 10/11
-- Node.js 20+
+- Node.js 22+
 - npm
 
 Install globally:
