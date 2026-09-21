@@ -105,6 +105,24 @@ test('fetchWorklogTasksForProject caches merged tasks per project', async () => 
   assert.equal(calls.length, 2);
 });
 
+test('fetchWorklogTasksForProject does not pass task cache Map into fetch cache option', async () => {
+  const fetchOptions = [];
+  globalThis.fetch = async (_url, init = {}) => {
+    fetchOptions.push(init);
+    return new Response(JSON.stringify({ data: [{ id: 1, name: 'Task', project_id: 643 }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  };
+
+  await fetchWorklogTasksForProject('token', 643, { cache: new Map() });
+  assert.ok(fetchOptions.length >= 1);
+  for (const init of fetchOptions) {
+    assert.notEqual(init.cache instanceof Map, true);
+    assert.equal(init.cache, undefined);
+  }
+});
+
 test('addLogtime resolves task name then creates logwork entry', async () => {
   const calls = [];
   globalThis.fetch = async (url, init) => {
