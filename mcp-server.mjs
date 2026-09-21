@@ -3,7 +3,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { ApiError } from './lib/api.mjs';
+import { ApiError, deleteLogworkEntry } from './lib/api.mjs';
 import { queryApplyLedger } from './lib/apply-ledger.mjs';
 import {
   applyLogworkBatch,
@@ -28,13 +28,17 @@ import {
   upsertProjectMapping
 } from './lib/project-mapping-workflow.mjs';
 import { readPackageVersion } from './lib/package-info.mjs';
-import { queryLogwork } from './lib/query-workflow.mjs';
+import { createResourceOptimiserSession, queryLogwork } from './lib/query-workflow.mjs';
 import { reconcileLogwork } from './lib/reconciliation-workflow.mjs';
 import {
   applyRoLogworkEdit,
   createRoEditPreviewFingerprint,
   previewRoLogworkEdit
 } from './lib/ro-edit-workflow.mjs';
+import {
+  applyRoLogworkResubmit,
+  previewRoLogworkResubmit
+} from './lib/ro-resubmit-workflow.mjs';
 import {
   disableLogworkReminder,
   enableLogworkReminder,
@@ -48,6 +52,7 @@ const MAX_PREVIEWS = 100;
 const previews = new Map();
 const jiraPreviews = new Map();
 const roEditPreviews = new Map();
+const roResubmitPreviews = new Map();
 
 const server = new McpServer({
   name: 'logwork-helper',
@@ -59,11 +64,12 @@ server.registerTool('preview_logwork_batch', {
   inputSchema: {
     text: z.string().min(1).describe('Weekly log block with headings like Monday, 01 Jun 2026 and entries like +2 Task.'),
     timezone: z.string().optional().describe('Reserved for future date parsing; current parser uses explicit dates in the text.'),
-    projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Map preview entry id to projectMemberId.')
+    projectOverrides: z.record(z.string(), z.union([z.string(), z.number()])).optional().describe('Map preview entry id to projectMemberId.'),
+    typeOfWork: z.enum(['create', 'correct', 'improve', 'other']).optional().describe('Default type_of_work for new RO entries. Defaults to other.')
   }
-}, withAuthRequiredHandling(async ({ text, projectOverrides = {} }) => {
+}, withAuthRequiredHandling(async ({ text, projectOverrides = {}, typeOfWork }) => {
   prunePreviewCache(previews);
-  const preview = await previewLogworkBatch({ text, projectOverrides });
+  const preview = await previewLogworkBatch({ text, projectOverrides, typeOfWork });
   setCachedPreview(previews, preview);
   return formatToolResponse(preview);
 }));
@@ -137,6 +143,64 @@ server.registerTool('apply_ro_logwork_edit', {
     confirm
   });
   return formatToolResponse(result);
+}));
+
+server.registerTool('preview_ro_logwork_resubmit', {
+  description: 'Resource Optimiser only: preview resubmitting a rejected logwork entry back to approved status.',
+  inputSchema: {
+    logworkId: z.union([z.string().min(1), z.number().int().positive()]),
+    hours: z.number().positive().optional(),
+    typeOfWork: z.enum(['create', 'correct', 'improve', 'other']).optional(),
+    noteToPm: z.string().max(500).optional(),
+    description: z.string().max(1_000).optional()
+  }
+}, withAuthRequiredHandling(async (input) => {
+  prunePreviewCache(roResubmitPreviews);
+  const preview = await previewRoLogworkResubmit(input);
+  setCachedPreview(roResubmitPreviews, preview);
+  return formatToolResponse(preview);
+}));
+
+server.registerTool('apply_ro_logwork_resubmit', {
+  description: 'Resource Optimiser only: apply a cached rejected-entry resubmit preview. Requires confirm: true.',
+  inputSchema: {
+    previewId: z.string().optional(),
+    preview: z.any().optional(),
+    confirm: z.boolean()
+  }
+}, withAuthRequiredHandling(async ({ previewId, preview, confirm }) => {
+  prunePreviewCache(roResubmitPreviews);
+  if (confirm !== true) {
+    throw new Error('apply_ro_logwork_resubmit requires confirm: true.');
+  }
+  const approvedPreview = consumeApprovedRoEditPreview({
+    cache: roResubmitPreviews,
+    previewId,
+    preview
+  });
+  const result = await applyRoLogworkResubmit({ preview: approvedPreview, confirm });
+  return formatToolResponse(result);
+}));
+
+server.registerTool('delete_ro_logwork_entry', {
+  description: 'Resource Optimiser only: soft-delete a submitted or approved logwork entry. Requires confirm: true.',
+  inputSchema: {
+    logworkId: z.union([z.string().min(1), z.number().int().positive()]),
+    confirm: z.boolean()
+  }
+}, withAuthRequiredHandling(async ({ logworkId, confirm }) => {
+  if (confirm !== true) {
+    throw new Error('delete_ro_logwork_entry requires confirm: true.');
+  }
+  const session = createResourceOptimiserSession();
+  const { token } = await session.get();
+  const result = await deleteLogworkEntry(token, logworkId);
+  return formatToolResponse({
+    status: 'deleted',
+    logworkId,
+    dryRun: Boolean(result?.dryRun),
+    summary: `Deleted RO logwork entry ${logworkId}.`
+  });
 }));
 
 server.registerTool('query_logwork', {

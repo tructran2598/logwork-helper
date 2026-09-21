@@ -11,6 +11,10 @@ import {
   normalizeTimesheetRangeResult
 } from '../lib/api.mjs';
 
+async function stubFetchLogworkDay() {
+  return { entries: [], isLocked: false };
+}
+
 const records = [
   {
     date: '2026-06-05',
@@ -120,6 +124,7 @@ test('queryLogwork filters by project id/name/ticket mapping and falls back for 
     project: 'SCB',
     cwd: '/private/tmp/no-config-here',
     fetchRange: async () => records,
+    fetchLogworkDay: stubFetchLogworkDay,
     fetchDayLogs: async (args) => {
       fetchedDayLogs.push(args);
       return {
@@ -150,6 +155,7 @@ test('queryLogwork filters by project id/name/ticket mapping and falls back for 
     project: 'Course',
     cwd: '/private/tmp/no-config-here',
     fetchRange: async () => records,
+    fetchLogworkDay: stubFetchLogworkDay,
     fetchDayLogs: async (args) => {
       fetchedDayLogs.push(args);
       return {
@@ -209,10 +215,12 @@ test('queryLogwork exposes normalization warnings without changing query fields'
   assert.deepEqual(Object.keys(result).sort(), [
     'days',
     'entries',
+    'f03ByDate',
     'missingDetailEntries',
     'normalization',
     'projects',
     'range',
+    'rejectedEntries',
     'summary',
     'totals',
     'unmatchedProjectFilter'
@@ -324,6 +332,7 @@ test('queryLogwork lists detailed project logs from real timesheet shape only fo
     from: '2026-06-01',
     to: '2026-06-03',
     fetchRange: async () => timesheetRecords,
+    fetchLogworkDay: stubFetchLogworkDay,
     fetchDayLogs: async (args) => {
       detailCalls.push(args);
       return {

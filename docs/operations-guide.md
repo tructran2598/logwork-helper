@@ -42,6 +42,8 @@ Resource Optimiser credentials and Jira PATs are never accepted by MCP tools. Th
 | Query RO | - | `/query <period>` | `query_logwork` | No |
 | Preview/apply RO | - | `/logwork ro` | `preview_logwork_batch`, `apply_logwork_batch` | Apply only |
 | Edit existing RO logwork | `edit` | `/edit-logwork` | `preview_ro_logwork_edit`, `apply_ro_logwork_edit` | Apply only |
+| Resubmit rejected RO | - | - | `preview_ro_logwork_resubmit`, `apply_ro_logwork_resubmit` | Apply only |
+| Delete RO entry | - | - | `delete_ro_logwork_entry` | Apply only |
 | Preview/apply Jira | - | `/logwork jira` | `preview_jira_worklog_batch`, `apply_jira_worklog_batch` | Apply only |
 | Preview/apply Both | - | `/logwork both` | Run both target flows separately | Apply only |
 | Project mapping | - | `/projects`, `/map` | `list_logwork_projects`, `upsert_project_mapping` | Local config only |
@@ -71,6 +73,25 @@ MCP uses:
 RO resolves each task to a project using the approved preview override, local ticket/keyword mappings, booked projects, and available project memberships. Jira is not written by this flow.
 
 Creating new RO logwork uses `POST /logwork/entries`. The helper resolves each batch task name to a Resource Optimiser worklog task (`GET /logwork/tasks` and `/logwork/tasks/defaults` for the matched project). The task name in your batch text must match the RO worklog task name exactly (case-insensitive). New entries are created with `status: approved` and `type_of_work: other` by default, aligned with the RO manual logwork UI.
+
+Optional MCP `preview_logwork_batch` input `typeOfWork` (`create`, `correct`, `improve`, `other`) overrides the batch default for new F03 creates.
+
+### Staff API surface (F03 vs legacy)
+
+| Intent | HTTP | Used by helper |
+| --- | --- | --- |
+| Create entry (approved) | `POST /logwork/entries` | `preview_logwork_batch` / `apply_logwork_batch` |
+| List worklog tasks | `GET /logwork/tasks`, `/logwork/tasks/defaults` | Batch preview task resolution |
+| Day view (status, lock) | `GET /logwork/day` | `query_logwork` entry enrichment |
+| Weekly summary | `GET /logwork/weekly` | Available in API client; booked hours still come from legacy timesheet |
+| Rejected list | `GET /logwork/rejected` | Optional query enrichment (`includeRejected` when wired) |
+| Resubmit rejected | `PATCH /logwork/entries/:id/resubmit` | `preview_ro_logwork_resubmit`, `apply_ro_logwork_resubmit` |
+| Delete submitted/approved | `DELETE /logwork/entries/:id` | `delete_ro_logwork_entry` (confirm required) |
+| Booked + logged range | `GET /member-logtime/timesheet` | `query_logwork`, batch booked-project resolution |
+| Day task detail | `GET /member-logtime` | `query_logwork` entry lines |
+| Edit hours/task label | `PATCH /member-logtime` `update_data` | `preview_ro_logwork_edit`, `apply_ro_logwork_edit` |
+
+Legacy `PATCH` updates `task_name` text only; it does not remap `worklog_task_id`. Prefer F03 create/resubmit flows when task catalog alignment matters.
 
 ### Edit Existing Resource Optimiser Logwork
 

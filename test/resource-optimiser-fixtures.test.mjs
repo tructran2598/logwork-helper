@@ -7,6 +7,18 @@ import {
   normalizeTimesheetRange
 } from '../lib/api.mjs';
 
+test('Resource Optimiser assign_hours timesheet fixture normalizes booked hours', async () => {
+  const payload = await readFixture('timesheet-assign-hours-shape.json');
+  const records = normalizeTimesheetRange(payload, {
+    from: '2026-06-01',
+    to: '2026-06-02'
+  });
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].bookedHours, 8);
+  assert.equal(records[0].loggedHours, 8);
+});
+
 test('Resource Optimiser project timesheet fixture normalizes booked/logged records', async () => {
   const payload = await readFixture('timesheet-project-shape.json');
   const records = normalizeTimesheetRange(payload, {
