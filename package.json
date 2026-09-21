@@ -39,6 +39,7 @@
     "cli.mjs",
     "config.mjs",
     "diagnostics-cli.mjs",
+    "delete-logwork-cli.mjs",
     "edit-logwork-cli.mjs",
     "history-cli.mjs",
     "install-user.mjs",

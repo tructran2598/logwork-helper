@@ -43,7 +43,7 @@ Resource Optimiser credentials and Jira PATs are never accepted by MCP tools. Th
 | Preview/apply RO | - | `/logwork ro` | `preview_logwork_batch`, `apply_logwork_batch` | Apply only |
 | Edit existing RO logwork | `edit` | `/edit-logwork` | `preview_ro_logwork_edit`, `apply_ro_logwork_edit` | Apply only |
 | Resubmit rejected RO | - | - | `preview_ro_logwork_resubmit`, `apply_ro_logwork_resubmit` | Apply only |
-| Delete RO entry | - | - | `delete_ro_logwork_entry` | Apply only |
+| Delete RO entry | `delete` | - | `preview_ro_logwork_delete`, `apply_ro_logwork_delete`, `delete_ro_logwork_entry` | Apply only |
 | Preview/apply Jira | - | `/logwork jira` | `preview_jira_worklog_batch`, `apply_jira_worklog_batch` | Apply only |
 | Preview/apply Both | - | `/logwork both` | Run both target flows separately | Apply only |
 | Project mapping | - | `/projects`, `/map` | `list_logwork_projects`, `upsert_project_mapping` | Local config only |
@@ -114,6 +114,24 @@ MCP uses two separate tools:
 2. `apply_ro_logwork_edit` with the cached `previewId` and `confirm: true`.
 
 The API write uses `PATCH /member-logtime/{projectMemberId}` and sends the logwork entry ID inside `update_data`. The helper reads the original entry and sends the complete merged values required by RO. Only hours and task name may change; project and date remain unchanged. Apply re-checks the original revision before PATCH and verifies the saved entry afterward. Entries owned by another user or created by Jira are blocked.
+
+### Delete mistaken Resource Optimiser logwork
+
+Use the entry ID from `query_logwork` or the RO UI. Only **submitted** or **approved** entries can be soft-deleted; **rejected** entries must be resubmitted or edited instead.
+
+```bash
+logwork-helper delete 290364
+logwork-helper delete 290364 --yes --json
+```
+
+MCP (two-step, recommended):
+
+1. `preview_ro_logwork_delete` with `logworkId`
+2. `apply_ro_logwork_delete` with cached `previewId` and `confirm: true`
+
+One-step shortcut: `delete_ro_logwork_entry` with `logworkId` and `confirm: true` (still previews and checks revision before DELETE).
+
+The API call is `DELETE /logwork/entries/:id` (soft-delete via `deleted_date`).
 
 ### Jira
 

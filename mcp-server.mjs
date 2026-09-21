@@ -3,7 +3,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { ApiError, deleteLogworkEntry } from './lib/api.mjs';
+import { ApiError } from './lib/api.mjs';
 import { queryApplyLedger } from './lib/apply-ledger.mjs';
 import {
   applyLogworkBatch,
@@ -28,7 +28,7 @@ import {
   upsertProjectMapping
 } from './lib/project-mapping-workflow.mjs';
 import { readPackageVersion } from './lib/package-info.mjs';
-import { createResourceOptimiserSession, queryLogwork } from './lib/query-workflow.mjs';
+import { queryLogwork } from './lib/query-workflow.mjs';
 import { reconcileLogwork } from './lib/reconciliation-workflow.mjs';
 import {
   applyRoLogworkEdit,
@@ -39,6 +39,10 @@ import {
   applyRoLogworkResubmit,
   previewRoLogworkResubmit
 } from './lib/ro-resubmit-workflow.mjs';
+import {
+  applyRoLogworkDelete,
+  previewRoLogworkDelete
+} from './lib/ro-delete-workflow.mjs';
 import {
   disableLogworkReminder,
   enableLogworkReminder,
@@ -53,6 +57,7 @@ const previews = new Map();
 const jiraPreviews = new Map();
 const roEditPreviews = new Map();
 const roResubmitPreviews = new Map();
+const roDeletePreviews = new Map();
 
 const server = new McpServer({
   name: 'logwork-helper',
@@ -182,8 +187,41 @@ server.registerTool('apply_ro_logwork_resubmit', {
   return formatToolResponse(result);
 }));
 
+server.registerTool('preview_ro_logwork_delete', {
+  description: 'Resource Optimiser only: preview soft-deleting a submitted or approved logwork entry. Rejected entries cannot be deleted.',
+  inputSchema: {
+    logworkId: z.union([z.string().min(1), z.number().int().positive()])
+  }
+}, withAuthRequiredHandling(async ({ logworkId }) => {
+  prunePreviewCache(roDeletePreviews);
+  const preview = await previewRoLogworkDelete({ logworkId });
+  setCachedPreview(roDeletePreviews, preview);
+  return formatToolResponse(preview);
+}));
+
+server.registerTool('apply_ro_logwork_delete', {
+  description: 'Resource Optimiser only: apply a cached delete preview after explicit approval. Requires confirm: true.',
+  inputSchema: {
+    previewId: z.string().optional(),
+    preview: z.any().optional(),
+    confirm: z.boolean()
+  }
+}, withAuthRequiredHandling(async ({ previewId, preview, confirm }) => {
+  prunePreviewCache(roDeletePreviews);
+  if (confirm !== true) {
+    throw new Error('apply_ro_logwork_delete requires confirm: true.');
+  }
+  const approvedPreview = consumeApprovedRoEditPreview({
+    cache: roDeletePreviews,
+    previewId,
+    preview
+  });
+  const result = await applyRoLogworkDelete({ preview: approvedPreview, confirm });
+  return formatToolResponse(result);
+}));
+
 server.registerTool('delete_ro_logwork_entry', {
-  description: 'Resource Optimiser only: soft-delete a submitted or approved logwork entry. Requires confirm: true.',
+  description: 'Resource Optimiser only: preview and soft-delete a submitted or approved logwork entry in one step. Requires confirm: true. Prefer preview_ro_logwork_delete + apply_ro_logwork_delete for two-step approval.',
   inputSchema: {
     logworkId: z.union([z.string().min(1), z.number().int().positive()]),
     confirm: z.boolean()
@@ -192,15 +230,9 @@ server.registerTool('delete_ro_logwork_entry', {
   if (confirm !== true) {
     throw new Error('delete_ro_logwork_entry requires confirm: true.');
   }
-  const session = createResourceOptimiserSession();
-  const { token } = await session.get();
-  const result = await deleteLogworkEntry(token, logworkId);
-  return formatToolResponse({
-    status: 'deleted',
-    logworkId,
-    dryRun: Boolean(result?.dryRun),
-    summary: `Deleted RO logwork entry ${logworkId}.`
-  });
+  const preview = await previewRoLogworkDelete({ logworkId });
+  const result = await applyRoLogworkDelete({ preview, confirm: true });
+  return formatToolResponse(result);
 }));
 
 server.registerTool('query_logwork', {

@@ -44,6 +44,7 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.deepEqual(names, [
       'apply_jira_worklog_batch',
       'apply_logwork_batch',
+      'apply_ro_logwork_delete',
       'apply_ro_logwork_edit',
       'apply_ro_logwork_resubmit',
       'apply_update',
@@ -55,6 +56,7 @@ test('MCP server lists logwork tools over stdio', async () => {
       'list_logwork_projects',
       'preview_jira_worklog_batch',
       'preview_logwork_batch',
+      'preview_ro_logwork_delete',
       'preview_ro_logwork_edit',
       'preview_ro_logwork_resubmit',
       'query_apply_history',

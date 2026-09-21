@@ -93,6 +93,14 @@ Target both filters entries that came from the combined Both flow.`
 
 Project and date are preserved. The write requires interactive confirmation or --yes.`
   }],
+  ['delete', {
+    script: 'delete-logwork-cli.mjs',
+    description: 'Preview and soft-delete a submitted or approved Resource Optimiser logwork entry.',
+    help: `Usage:
+  logwork-helper delete <logwork-id> [--yes] [--json]
+
+Soft-deletes via DELETE /logwork/entries/:id. Only submitted or approved entries. Requires confirmation or --yes.`
+  }],
   ['reconcile', {
     script: 'reconcile-cli.mjs',
     description: 'Compare Resource Optimiser and Jira worklogs by preset period.',
