@@ -41,6 +41,7 @@ Resource Optimiser credentials and Jira PATs are never accepted by MCP tools. Th
 | --- | --- | --- | --- | --- |
 | Query RO | - | `/query <period>` | `query_logwork` | No |
 | Preview/apply RO | - | `/logwork ro` | `preview_logwork_batch`, `apply_logwork_batch` | Apply only |
+| Edit existing RO logwork | `edit` | `/edit-logwork` | `preview_ro_logwork_edit`, `apply_ro_logwork_edit` | Apply only |
 | Preview/apply Jira | - | `/logwork jira` | `preview_jira_worklog_batch`, `apply_jira_worklog_batch` | Apply only |
 | Preview/apply Both | - | `/logwork both` | Run both target flows separately | Apply only |
 | Project mapping | - | `/projects`, `/map` | `list_logwork_projects`, `upsert_project_mapping` | Local config only |
@@ -68,6 +69,30 @@ MCP uses:
 2. `apply_logwork_batch`
 
 RO resolves each task to a project using the approved preview override, local ticket/keyword mappings, booked projects, and available project memberships. Jira is not written by this flow.
+
+Creating new RO logwork uses `POST /logwork/entries`. The helper resolves each batch task name to a Resource Optimiser worklog task (`GET /logwork/tasks` and `/logwork/tasks/defaults` for the matched project). The task name in your batch text must match the RO worklog task name exactly (case-insensitive). New entries are created with `status: approved` and `type_of_work: other` by default, aligned with the RO manual logwork UI.
+
+### Edit Existing Resource Optimiser Logwork
+
+Use the logwork entry ID returned by an RO query:
+
+```bash
+logwork-helper edit 290364 --hours 0.5
+logwork-helper edit 290364 --task-name "Updated task name (SCB-470)"
+```
+
+The terminal UI equivalent is:
+
+```text
+/edit-logwork 290364 --hours 0.5 --task-name Updated task name (SCB-470)
+```
+
+MCP uses two separate tools:
+
+1. `preview_ro_logwork_edit` with `logworkId` and at least one of `hours` or `taskName`.
+2. `apply_ro_logwork_edit` with the cached `previewId` and `confirm: true`.
+
+The API write uses `PATCH /member-logtime/{projectMemberId}` and sends the logwork entry ID inside `update_data`. The helper reads the original entry and sends the complete merged values required by RO. Only hours and task name may change; project and date remain unchanged. Apply re-checks the original revision before PATCH and verifies the saved entry afterward. Entries owned by another user or created by Jira are blocked.
 
 ### Jira
 

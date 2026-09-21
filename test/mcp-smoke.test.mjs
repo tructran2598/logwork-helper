@@ -9,12 +9,16 @@ import {
   assertNoFinalProjectOverrides,
   consumeApprovedBatch,
   consumeApprovedJiraBatch,
+  consumeApprovedRoEditPreview,
   getCachedPreview,
   getCachedJiraPreview,
+  getCachedRoEditPreview,
   resolveApprovedBatch,
   resolveApprovedJiraBatch,
+  resolveApprovedRoEditPreview,
   setCachedPreview,
-  setCachedJiraPreview
+  setCachedJiraPreview,
+  setCachedRoEditPreview
 } from '../mcp-server.mjs';
 
 test('MCP server lists logwork tools over stdio', async () => {
@@ -40,6 +44,7 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.deepEqual(names, [
       'apply_jira_worklog_batch',
       'apply_logwork_batch',
+      'apply_ro_logwork_edit',
       'apply_update',
       'check_for_updates',
       'configure_logwork_reminder',
@@ -48,6 +53,7 @@ test('MCP server lists logwork tools over stdio', async () => {
       'list_logwork_projects',
       'preview_jira_worklog_batch',
       'preview_logwork_batch',
+      'preview_ro_logwork_edit',
       'query_apply_history',
       'query_logwork',
       'reconcile_logwork',
@@ -69,6 +75,12 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.equal(queryTool.inputSchema.properties.date, undefined);
     assert.equal(queryTool.inputSchema.properties.from, undefined);
     assert.equal(queryTool.inputSchema.properties.to, undefined);
+    const roEditPreviewTool = result.tools.find((tool) => tool.name === 'preview_ro_logwork_edit');
+    assert.match(roEditPreviewTool.description, /Project and date are always preserved/);
+    assert.deepEqual(Object.keys(roEditPreviewTool.inputSchema.properties).sort(), ['hours', 'logworkId', 'taskName']);
+    const roEditApplyTool = result.tools.find((tool) => tool.name === 'apply_ro_logwork_edit');
+    assert.deepEqual(Object.keys(roEditApplyTool.inputSchema.properties).sort(), ['confirm', 'preview', 'previewId']);
+    assert.equal(roEditApplyTool.inputSchema.properties.confirm.type, 'boolean');
     const reconciliationTool = result.tools.find((tool) => tool.name === 'reconcile_logwork');
     assert.match(reconciliationTool.description, /Read-only/);
     assert.deepEqual(reconciliationTool.inputSchema.properties.period.enum, ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month']);
@@ -114,7 +126,7 @@ test('MCP server lists logwork tools over stdio', async () => {
     assert.match(jiraApplyTool.description, /Does not write Resource Optimiser/);
     assert.deepEqual(Object.keys(jiraApplyTool.inputSchema.properties).sort(), ['batch', 'batchId', 'confirm']);
     assert.equal(jiraApplyTool.inputSchema.properties.confirm.type, 'boolean');
-    for (const tool of [jiraAuthTool, jiraIssueTool, jiraPreviewTool, jiraApplyTool]) {
+    for (const tool of [roEditPreviewTool, roEditApplyTool, jiraAuthTool, jiraIssueTool, jiraPreviewTool, jiraApplyTool]) {
       assert.equal(tool.inputSchema.properties.password, undefined);
       assert.equal(tool.inputSchema.properties.pat, undefined);
       assert.equal(tool.inputSchema.properties.token, undefined);
@@ -149,6 +161,16 @@ test('MCP server lists logwork tools over stdio', async () => {
     });
     assert.equal(rejectedReminder.isError, true);
     assert.match(rejectedReminder.content[0].text, /requires confirm: true/);
+
+    const rejectedRoEdit = await client.callTool({
+      name: 'apply_ro_logwork_edit',
+      arguments: {
+        previewId: 'ro_edit_test',
+        confirm: false
+      }
+    });
+    assert.equal(rejectedRoEdit.isError, true);
+    assert.match(rejectedRoEdit.content[0].text, /requires confirm: true/);
   } finally {
     await client.close();
   }
@@ -388,6 +410,36 @@ test('MCP Jira apply accepts matching batch echo and consumes cached preview', (
   assert.equal(getCachedJiraPreview(cache, preview.batchId, now), null);
 });
 
+test('MCP RO edit cache expires, rejects mutations, and consumes approved preview', () => {
+  const cache = new Map();
+  const now = 1_000;
+  const preview = createApprovedRoEditPreview();
+
+  setCachedRoEditPreview(cache, preview, now);
+  assert.equal(getCachedRoEditPreview(cache, preview.previewId, now).updated.hours, 0.5);
+
+  const mutated = structuredClone(preview);
+  mutated.updated.taskName = 'forged task';
+  assert.throws(() => resolveApprovedRoEditPreview({
+    cache,
+    previewId: preview.previewId,
+    preview: mutated,
+    now
+  }), /changed after preview/);
+
+  const approved = consumeApprovedRoEditPreview({
+    cache,
+    previewId: preview.previewId,
+    preview,
+    now
+  });
+  assert.equal(approved.original.taskName, 'original task');
+  assert.equal(getCachedRoEditPreview(cache, preview.previewId, now), null);
+
+  setCachedRoEditPreview(cache, preview, now);
+  assert.equal(getCachedRoEditPreview(cache, preview.previewId, now + 60 * 60 * 1000), null);
+});
+
 function createApprovedPreview() {
   return {
     batchId: 'batch-safe',
@@ -441,5 +493,41 @@ function createApprovedJiraPreview() {
       }
     ],
     summary: 'Jira worklog preview: ready. 1 entries, 2h total.'
+  };
+}
+
+function createApprovedRoEditPreview() {
+  return {
+    previewId: 'ro_edit_safe',
+    status: 'ready',
+    logworkId: 290364,
+    original: {
+      id: 290364,
+      projectMemberId: 5234,
+      projectId: 2621,
+      projectName: 'Course Builder',
+      date: '2026-07-15',
+      hours: 1,
+      taskName: 'original task',
+      status: 'submitted',
+      source: 'manual'
+    },
+    updated: {
+      id: 290364,
+      projectMemberId: 5234,
+      projectId: 2621,
+      projectName: 'Course Builder',
+      date: '2026-07-15',
+      hours: 0.5,
+      taskName: 'original task',
+      status: 'submitted',
+      source: 'manual'
+    },
+    changes: {
+      hours: { from: 1, to: 0.5 },
+      taskName: null
+    },
+    originalFingerprint: 'source-revision',
+    summary: 'RO edit ready.'
   };
 }

@@ -31,6 +31,11 @@ import { readPackageVersion } from './lib/package-info.mjs';
 import { queryLogwork } from './lib/query-workflow.mjs';
 import { reconcileLogwork } from './lib/reconciliation-workflow.mjs';
 import {
+  applyRoLogworkEdit,
+  createRoEditPreviewFingerprint,
+  previewRoLogworkEdit
+} from './lib/ro-edit-workflow.mjs';
+import {
   disableLogworkReminder,
   enableLogworkReminder,
   getLogworkReminderStatus,
@@ -42,6 +47,7 @@ const PREVIEW_TTL_MS = 60 * 60 * 1000;
 const MAX_PREVIEWS = 100;
 const previews = new Map();
 const jiraPreviews = new Map();
+const roEditPreviews = new Map();
 
 const server = new McpServer({
   name: 'logwork-helper',
@@ -87,6 +93,48 @@ server.registerTool('apply_logwork_batch', {
     batch: approvedBatch,
     confirm,
     allowUnbooked
+  });
+  return formatToolResponse(result);
+}));
+
+server.registerTool('preview_ro_logwork_edit', {
+  description: 'Resource Optimiser only: read one existing RO logwork and preview changing its hours and/or task name. Project and date are always preserved. Jira-created entries are blocked.',
+  inputSchema: {
+    logworkId: z.union([z.string().min(1), z.number().int().positive()]).describe('Existing Resource Optimiser logwork id returned by query_logwork.'),
+    hours: z.number().positive().optional().describe('Optional replacement hours. The existing value is preserved when omitted.'),
+    taskName: z.string().min(1).max(1_000).optional().describe('Optional replacement task name. The existing value is preserved when omitted.')
+  }
+}, withAuthRequiredHandling(async ({ logworkId, hours, taskName }) => {
+  prunePreviewCache(roEditPreviews);
+  const preview = await previewRoLogworkEdit({
+    logworkId,
+    hours,
+    taskName
+  });
+  setCachedRoEditPreview(roEditPreviews, preview);
+  return formatToolResponse(preview);
+}));
+
+server.registerTool('apply_ro_logwork_edit', {
+  description: 'Resource Optimiser only: apply an approved cached RO edit preview. Requires confirm: true, re-checks that the original logwork has not changed, and verifies the persisted result.',
+  inputSchema: {
+    previewId: z.string().optional().describe('previewId returned by preview_ro_logwork_edit. Required for apply.'),
+    preview: z.any().optional().describe('Optional structured preview echo. When provided, it must match the cached preview for previewId.'),
+    confirm: z.boolean().describe('Must be true after explicit user approval.')
+  }
+}, withAuthRequiredHandling(async ({ previewId, preview, confirm }) => {
+  prunePreviewCache(roEditPreviews);
+  if (confirm !== true) {
+    throw new Error('apply_ro_logwork_edit requires confirm: true.');
+  }
+  const approvedPreview = consumeApprovedRoEditPreview({
+    cache: roEditPreviews,
+    previewId,
+    preview
+  });
+  const result = await applyRoLogworkEdit({
+    preview: approvedPreview,
+    confirm
   });
   return formatToolResponse(result);
 }));
@@ -340,6 +388,22 @@ export function getCachedJiraPreview(cache, batchId, now = Date.now()) {
   return cached ? clonePreview(cached.preview) : null;
 }
 
+export function setCachedRoEditPreview(cache, preview, now = Date.now()) {
+  prunePreviewCache(cache, now);
+  const cachedPreview = clonePreview(preview);
+  cache.set(cachedPreview.previewId, {
+    preview: cachedPreview,
+    fingerprint: createRoEditPreviewFingerprint(cachedPreview),
+    expiresAt: now + PREVIEW_TTL_MS
+  });
+  prunePreviewCache(cache, now);
+}
+
+export function getCachedRoEditPreview(cache, previewId, now = Date.now()) {
+  const cached = getCachedPreviewRecord(cache, previewId, now);
+  return cached ? clonePreview(cached.preview) : null;
+}
+
 function getCachedPreviewRecord(cache, batchId, now = Date.now()) {
   const cached = cache.get(batchId);
   if (!cached) {
@@ -452,6 +516,45 @@ export function consumeApprovedJiraBatch({
   });
   cache.delete(batchId);
   return approvedBatch;
+}
+
+export function resolveApprovedRoEditPreview({
+  cache,
+  previewId,
+  preview,
+  now = Date.now()
+}) {
+  if (!previewId) {
+    throw new Error('apply_ro_logwork_edit requires previewId from preview_ro_logwork_edit. Re-run preview_ro_logwork_edit and apply using the returned previewId.');
+  }
+  if (preview?.previewId && preview.previewId !== previewId) {
+    throw new Error(`Approved RO edit mismatch: previewId ${previewId} does not match preview.previewId ${preview.previewId}. Re-run preview_ro_logwork_edit before applying.`);
+  }
+
+  const cached = getCachedPreviewRecord(cache, previewId, now);
+  if (!cached) {
+    throw new Error('Missing cached RO edit preview for previewId. Re-run preview_ro_logwork_edit before applying.');
+  }
+  if (preview && createRoEditPreviewFingerprint(preview) !== cached.fingerprint) {
+    throw new Error('Approved RO edit preview changed after preview. Re-run preview_ro_logwork_edit before applying.');
+  }
+  return clonePreview(cached.preview);
+}
+
+export function consumeApprovedRoEditPreview({
+  cache,
+  previewId,
+  preview,
+  now = Date.now()
+}) {
+  const approvedPreview = resolveApprovedRoEditPreview({
+    cache,
+    previewId,
+    preview,
+    now
+  });
+  cache.delete(previewId);
+  return approvedPreview;
 }
 
 export function assertNoFinalProjectOverrides(projectOverrides = {}) {

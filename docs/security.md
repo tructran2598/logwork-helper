@@ -162,6 +162,7 @@ Diagnostics reports:
 - Token is not stored in `.logwork-helper.json`.
 - Email may be remembered in the OS credential store to prefill the next login.
 - MCP writes logwork only after an assistant calls `apply_logwork_batch` with explicit confirmation and a cached preview `batchId`.
+- MCP edits an existing RO logwork only after `apply_ro_logwork_edit` receives explicit confirmation and a cached `previewId`. It preserves project/date, rejects Jira-created entries, stale-checks the original entry, and verifies the saved result.
 - MCP writes Jira worklogs only after an assistant calls `apply_jira_worklog_batch` with explicit confirmation and a cached Jira preview `batchId`.
 - Resource Optimiser apply and Jira worklog apply are separate flows. Applying Resource Optimiser logwork does not automatically write Jira worklogs.
 - Jira duplicate detection is blocking and has no override option in v1.

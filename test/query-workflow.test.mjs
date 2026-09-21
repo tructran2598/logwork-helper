@@ -361,5 +361,5 @@ test('queryLogwork lists detailed project logs from real timesheet shape only fo
   assert.equal(result.days[0].projects[0].entries.length, 2);
   assert.equal(result.days[0].projects[0].entries[0].taskName, 'Maintenance mode');
   assert.equal(result.days[1].projects[0].entries.length, 0);
-  assert.match(result.summary, /2026-06-01\n- 2621A-SIT-HTML BUILDER-PRJ: 8h logged \/ 8h booked\n  - \+3h Maintenance mode\n  - \+5h Question set UI/);
+  assert.match(result.summary, /2026-06-01\n- 2621A-SIT-HTML BUILDER-PRJ: 8h logged \/ 8h booked\n  - \[logworkId: 1\] \+3h Maintenance mode\n  - \[logworkId: 2\] \+5h Question set UI/);
 });

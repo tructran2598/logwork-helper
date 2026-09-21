@@ -29,6 +29,23 @@ Monday, 01 Jun 2026
 
 The assistant should use `preview_logwork_batch`, then `apply_logwork_batch` only after approval.
 
+## Edit Existing Resource Optimiser Logwork
+
+Find the RO logwork ID with `/query this-week` or ask the assistant to call `query_logwork`. Then use Terminal:
+
+```bash
+logwork-helper edit 290364 --hours 0.5
+logwork-helper edit 290364 --task-name "Updated task name (SCB-470)"
+```
+
+Or ask MCP:
+
+```text
+Preview changing RO logwork 290364 to 0.5 hours. Keep project, date, and task name unchanged, then ask before applying.
+```
+
+The assistant uses `preview_ro_logwork_edit`, presents the diff, and calls `apply_ro_logwork_edit` only after approval. The edit is blocked if the original entry changed after preview or was created by Jira.
+
 ## Log Jira Only
 
 Authenticate once:

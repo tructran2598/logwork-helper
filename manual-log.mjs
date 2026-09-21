@@ -216,6 +216,7 @@ REPL commands:
   /logwork ro
   /logwork jira
   /logwork both
+  /edit-logwork 290364 --hours 0.5
   /mcp
   /projects
   /projects 5234

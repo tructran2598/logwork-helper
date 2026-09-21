@@ -113,6 +113,8 @@ After editing config, restart or reload the IDE. The MCP server should expose:
 - `test_logwork_reminder`
 - `preview_logwork_batch`
 - `apply_logwork_batch`
+- `preview_ro_logwork_edit`
+- `apply_ro_logwork_edit`
 - `list_logwork_projects`
 - `upsert_project_mapping`
 - `start_auth_login`
@@ -229,7 +231,26 @@ Expected flow:
 
 `apply_logwork_batch` requires `confirm: true` and a cached `batchId` from the preview step. If the preview expired or changed, rerun `preview_logwork_batch` before applying.
 
+Preview also checks that each task name matches an existing Resource Optimiser worklog task for the resolved project. If preview reports `task_not_found`, fix the task name in your batch text or create/select the matching worklog task in RO, then preview again. Apply uses `POST /logwork/entries`, so new logwork is created as approved (not submitted).
+
 Use `preview_logwork_batch` and `apply_logwork_batch` only for Resource Optimiser. These tools do not write Jira worklogs.
+
+### Edit Existing Resource Optimiser Logwork
+
+First query RO logwork so the assistant has the entry ID, then ask:
+
+```text
+Change RO logwork 290364 from its current hours to 0.5 hours. Keep its project, date, and task name unchanged. Show me the diff and ask before applying.
+```
+
+Expected flow:
+
+1. Assistant calls `preview_ro_logwork_edit` with `logworkId: 290364` and `hours: 0.5`.
+2. Assistant shows the original and updated fields. Project and date must be shown as unchanged.
+3. Assistant asks for explicit approval.
+4. Assistant calls `apply_ro_logwork_edit` with the cached `previewId` and `confirm: true`.
+
+To change only the task, provide `taskName` and omit `hours`. To change both, provide both fields. Apply blocks missing, expired, or mutated previews; re-reads the RO entry to detect concurrent edits; and verifies the saved value. Jira-created RO entries cannot be edited through this tool.
 
 ### Preview Then Apply Jira Worklogs
 

@@ -117,6 +117,15 @@ test('parseHtmlForms finds Keycloak credential, device, and OTP forms', () => {
   `);
   assert.equal(variantCredentials.kind, 'credentials');
 
+  const passwordUpdate = selectNextKeycloakForm(`
+    <form action="/auth/realms/resource/login-actions/required-action?execution=UPDATE_PASSWORD" method="post">
+      <input type="password" id="password-new" name="password-new" autocomplete="new-password">
+      <input type="password" id="password-confirm" name="password-confirm" autocomplete="new-password">
+      <input type="submit" value="Submit">
+    </form>
+  `, 'https://keycloak.vinova.sg/auth/realms/resource/login-actions/required-action');
+  assert.equal(passwordUpdate.kind, 'password-update');
+
   const mfaCode = selectNextKeycloakForm(`
     <form action="/mfa" method="post">
       <input type="text" name="mfa_code">
@@ -279,6 +288,76 @@ test('authenticateWithApi submits variant credential and OTP field names', async
   assert.equal(requests[1].body.includes('password='), false);
   assert.equal(requests[2].body.includes('mfa_code=654321'), true);
   assert.equal(requests[2].body.includes('otp='), false);
+});
+
+test('authenticateWithApi completes required password update after OTP', async () => {
+  const finalToken = makeJwt({ id: 115, exp: futureExp() });
+  const requests = [];
+  const events = [];
+  let passwordUpdatePromptCount = 0;
+  const responses = [
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate?session_code=s1&execution=e1&tab_id=t1" method="post"><input name="username"><input name="password" type="password"></form>`),
+    htmlResponse(`<form action="/auth/realms/resource/login-actions/authenticate?session_code=s2&execution=e2&tab_id=t2" method="post"><input name="otp"></form>`),
+    htmlResponse(`
+      <html><head><title>Sign in to resource</title></head><body>
+        <h1>Update password</h1>
+        <p>You need to change your password to activate your account.</p>
+        <form action="/auth/realms/resource/login-actions/required-action?session_code=s3&execution=UPDATE_PASSWORD&tab_id=t3" method="post">
+          <input type="password" id="password-new" name="password-new" autocomplete="new-password">
+          <input type="password" id="password-confirm" name="password-confirm" autocomplete="new-password">
+          <input type="submit" value="Submit">
+        </form>
+      </body></html>
+    `),
+    redirectResponse('https://app.resourceoptimiser.com/vinova/check-login#code=auth-code&state=state-value'),
+    jsonResponse({ access_token: makeJwt({ sub: 'keycloak-user', exp: futureExp() }) }),
+    jsonResponse({ accessToken: finalToken })
+  ];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({
+      url: String(url),
+      method: options.method || 'GET',
+      body: String(options.body || '')
+    });
+    return responses.shift();
+  };
+
+  const token = await authenticateWithApi({
+    keycloakState: 'state-value',
+    keycloakNonce: 'nonce-value',
+    fetchImpl,
+    diagnosticsRecorder: {
+      event(name, details) {
+        events.push({ name, details });
+      }
+    },
+    credentialProvider: {
+      async requestCredentials() {
+        return {
+          email: 'user@example.com',
+          password: 'old-secret-password'
+        };
+      },
+      async requestOtp() {
+        return '654321';
+      },
+      async requestPasswordUpdate() {
+        passwordUpdatePromptCount += 1;
+        return {
+          newPassword: 'new-secret-password',
+          confirmPassword: 'new-secret-password'
+        };
+      }
+    }
+  });
+
+  assert.equal(token, finalToken);
+  assert.equal(passwordUpdatePromptCount, 1);
+  assert.equal(requests[3].url, 'https://keycloak.vinova.sg/auth/realms/resource/login-actions/required-action?session_code=s3&execution=UPDATE_PASSWORD&tab_id=t3');
+  assert.equal(requests[3].body.includes('password-new=new-secret-password'), true);
+  assert.equal(requests[3].body.includes('password-confirm=new-secret-password'), true);
+  assert.equal(events.some((event) => event.name === 'password_update_submit_result'), true);
+  assert.equal(JSON.stringify(events).includes('new-secret-password'), false);
 });
 
 test('authenticateWithApi submits mixed OTP and device form in one request', async () => {

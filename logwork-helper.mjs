@@ -92,6 +92,7 @@ try {
     try {
       result = await addLogtime(token, {
         projectMemberId: project.projectMemberId,
+        projectId: project.projectId,
         logtimes: hours,
         taskName,
         localDateISO
@@ -113,6 +114,7 @@ try {
       ({ projects, daySummaries } = await loadProjectData(token, userId, localDateISO));
       result = await addLogtime(token, {
         projectMemberId: project.projectMemberId,
+        projectId: project.projectId,
         logtimes: hours,
         taskName,
         localDateISO

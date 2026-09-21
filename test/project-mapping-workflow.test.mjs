@@ -69,7 +69,10 @@ test('upsertProjectMapping creates .logwork-helper.json and preview can use it',
     text: `Monday, 01 Jun 2026
 +2 Maintenance mode management (SCB-213)`.replace('++', '+'),
     fetchProjects: async () => [],
-    fetchMembershipProjects: async () => projects
+    fetchMembershipProjects: async () => projects,
+    fetchWorklogTasks: async () => [
+      { id: 42, name: 'Maintenance mode management (SCB-213)', project_id: 643 }
+    ]
   });
 
   assert.equal(preview.status, 'ready_with_unbooked');

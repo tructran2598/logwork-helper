@@ -6,7 +6,7 @@
 
 Local MCP server and terminal CLI for Resource Optimiser logwork and Jira self-hosted worklogs.
 
-Logwork Helper lets Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, Claude Code, and other MCP clients work with Resource Optimiser from your machine. It can query logged work, reconcile RO and Jira by day, preview and submit approved Resource Optimiser logwork, preview and submit approved Jira worklogs, map ticket prefixes to Resource Optimiser projects, keep a sanitized local apply history, schedule native OS reminders, and run a guided terminal flow through `logwork`.
+Logwork Helper lets Cursor, Codex, Google Antigravity, GitHub Copilot / VS Code, Claude Code, and other MCP clients work with Resource Optimiser from your machine. It can query logged work, safely edit the hours or task name of an existing RO logwork, reconcile RO and Jira by day, preview and submit approved Resource Optimiser logwork, preview and submit approved Jira worklogs, map ticket prefixes to Resource Optimiser projects, keep a sanitized local apply history, schedule native OS reminders, and run a guided terminal flow through `logwork`.
 
 Credentials stay local. Resource Optimiser passwords and 2FA codes, and Jira Personal Access Tokens, are entered in Terminal only, never in MCP config or AI chat.
 
@@ -164,6 +164,27 @@ Check my logwork for this week.
 
 Full client examples are in [docs/mcp-setup.md](docs/mcp-setup.md).
 
+## Edit Existing RO Logwork
+
+Use the logwork entry ID returned by `query_logwork` or `/query`:
+
+```bash
+logwork-helper edit 290364 --hours 0.5
+logwork-helper edit 290364 --task-name "Updated task name (SCB-470)"
+logwork-helper edit 290364 --hours 0.5 --task-name "Updated task name (SCB-470)"
+```
+
+The CLI reads the existing entry, previews the diff, and asks for confirmation. `--yes` is available for an already reviewed non-interactive command. Project and date are always preserved. Before writing, the helper re-reads the entry and blocks the update if it changed after preview; it then verifies the persisted result. RO entries created by Jira must be edited in Jira and are blocked by this flow.
+
+Inside `logwork`, use:
+
+```text
+/edit-logwork 290364 --hours 0.5
+/edit-logwork 290364 --task-name Updated task name (SCB-470)
+```
+
+MCP clients use `preview_ro_logwork_edit`, show the field-level diff, ask for approval, then call `apply_ro_logwork_edit` with the cached `previewId` and `confirm: true`.
+
 ## Daily Use
 
 Ask your assistant:
@@ -211,6 +232,7 @@ Useful terminal commands:
 /logwork ro
 /logwork jira
 /logwork both
+/edit-logwork 290364 --hours 0.5
 /mcp
 /projects
 /projects 5234

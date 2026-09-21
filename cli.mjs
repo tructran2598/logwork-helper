@@ -83,6 +83,16 @@ Options:
 Shows recent apply outcomes without credentials or raw API responses.
 Target both filters entries that came from the combined Both flow.`
   }],
+  ['edit', {
+    script: 'edit-logwork-cli.mjs',
+    description: 'Preview and edit an existing Resource Optimiser logwork.',
+    help: `Usage:
+  logwork-helper edit <logwork-id> --hours <hours> [--yes] [--json]
+  logwork-helper edit <logwork-id> --task-name <text> [--yes] [--json]
+  logwork-helper edit <logwork-id> --hours <hours> --task-name <text> [--yes] [--json]
+
+Project and date are preserved. The write requires interactive confirmation or --yes.`
+  }],
   ['reconcile', {
     script: 'reconcile-cli.mjs',
     description: 'Compare Resource Optimiser and Jira worklogs by preset period.',
@@ -146,6 +156,7 @@ Commands inside the REPL:
   /logwork ro
   /logwork jira
   /logwork both
+  /edit-logwork 290364 --hours 0.5
   /mcp
   /projects
   /projects 5234
@@ -239,6 +250,7 @@ function printHelp() {
   logwork-helper reminder status
   logwork-helper reconcile this-week
   logwork-helper history --target jira
+  logwork-helper edit 290364 --hours 0.5
   logwork-helper diagnostics
   logwork-helper doctor
   logwork-helper mcp

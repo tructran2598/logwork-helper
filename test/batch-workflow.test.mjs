@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyLogworkBatch,
-  buildLogworkBatchPreview
+  attachWorklogTaskTargets,
+  buildLogworkBatchPreview,
+  previewLogworkBatch
 } from '../lib/batch-workflow.mjs';
 import { parseWeeklyLogText } from '../lib/batch-parser.mjs';
 
@@ -215,10 +217,15 @@ test('applyLogworkBatch submits one payload per line', async () => {
   assert.equal(payloads.length, 2);
   assert.deepEqual(payloads[0], {
     projectMemberId: 5352,
+    projectId: 1,
     logtimes: 2,
     taskName: 'Maintenance mode management and status UI (SCB-213)',
-    localDateISO: '2026-06-01'
+    localDateISO: '2026-06-01',
+    worklogTaskId: undefined,
+    worklogNeedsProjectId: undefined,
+    taskCache: payloads[0].taskCache
   });
+  assert.ok(payloads[0].taskCache instanceof Map);
   assert.equal(result.verification, null);
 });
 
@@ -305,14 +312,60 @@ test('applyLogworkBatch submits unbooked entries with allowUnbooked true', async
   });
 
   assert.equal(result.status, 'submitted');
-  assert.deepEqual(payloads, [
-    {
-      projectMemberId: 5234,
-      logtimes: 2,
-      taskName: 'Maintenance mode management and status UI (SCB-213)',
-      localDateISO: '2026-06-01'
-    }
-  ]);
+  assert.equal(payloads.length, 1);
+  assert.equal(payloads[0].projectMemberId, 5234);
+  assert.equal(payloads[0].projectId, 643);
+  assert.equal(payloads[0].taskName, 'Maintenance mode management and status UI (SCB-213)');
+});
+
+test('attachWorklogTaskTargets marks missing RO tasks as unresolved', async () => {
+  const preview = buildLogworkBatchPreview({ parsed, projectsByDate });
+  const enriched = await attachWorklogTaskTargets(preview, {
+    fetchWorklogTasks: async () => []
+  });
+
+  assert.equal(enriched.status, 'unresolved');
+  assert.equal(enriched.entries[0].reason, 'task_not_found');
+  assert.equal(enriched.approvalSummary.canApply, false);
+});
+
+test('previewLogworkBatch resolves worklog tasks when names match', async () => {
+  const preview = await previewLogworkBatch({
+    text: weeklyText,
+    fetchProjects: async () => projectsByDate.get('2026-06-01'),
+    fetchWorklogTasks: async () => [
+      {
+        id: 88,
+        name: 'Maintenance mode management and status UI (SCB-213)',
+        project_id: 1
+      },
+      {
+        id: 89,
+        name: 'System page updates',
+        project_id: 1
+      }
+    ]
+  });
+
+  assert.equal(preview.status, 'ready');
+  assert.equal(preview.entries[0].worklogTaskId, 88);
+  assert.equal(preview.entries[1].worklogTaskId, 89);
+});
+
+test('applyLogworkBatch blocks preview with task_not_found entries', async () => {
+  const preview = buildLogworkBatchPreview({ parsed, projectsByDate });
+  const unresolvedPreview = await attachWorklogTaskTargets(preview, {
+    fetchWorklogTasks: async () => []
+  });
+
+  await assert.rejects(
+    () => applyLogworkBatch({
+      batch: unresolvedPreview,
+      confirm: true,
+      submitEntry: async () => ({ dryRun: true })
+    }),
+    /unresolved entries/
+  );
 });
 
 test('applyLogworkBatch verifies submitted date range after real submit', async () => {

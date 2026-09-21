@@ -83,6 +83,7 @@ test('manual command registry renders help and slash suggestions', () => {
   assert.match(formatManualHelp(), /last-month/);
   assert.match(formatManualHelp(), /\/reconcile \[today\|yesterday\|this-week/);
   assert.match(formatManualHelp(), /\/logwork/);
+  assert.match(formatManualHelp(), /\/edit-logwork <id> --hours/);
   assert.match(formatManualHelp(), /\/mcp \[cursor\|antigravity\|copilot\|claude-code\|codex\]/);
   assert.match(formatManualHelp(), /\/diagnostics/);
   assert.match(formatManualHelp(), /\/history \[ro\|jira\|both\]/);
@@ -115,7 +116,7 @@ test('manual command registry renders help and slash suggestions', () => {
   ]);
   assert.deepEqual(getCommandSuggestions('/mc').map((command) => command.name), ['/mcp']);
   assert.deepEqual(getCommandSuggestions('/ap').map((command) => command.name), []);
-  assert.deepEqual(getCommandSuggestions('/e').map((command) => command.name), []);
+  assert.deepEqual(getCommandSuggestions('/e').map((command) => command.name), ['/edit-logwork']);
   assert.deepEqual(getCommandSuggestions('/pre').map((command) => command.name), []);
   assert.deepEqual(getCommandSuggestions('/pro').map((command) => command.name), ['/projects']);
   assert.deepEqual(getCommandSuggestions('/di').map((command) => command.name), ['/diagnostics']);
@@ -178,6 +179,16 @@ test('Ink manual components render shell, current panel, pickers, menu, status, 
   }));
   assert.match(authOtpOutput, /2FA/);
   assert.doesNotMatch(authOtpOutput, /123456/);
+  const authPasswordUpdateOutput = renderToString(h(AuthPrompt, {
+    prompt: { step: 'password-update', field: 'newPassword' },
+    inputValue: 'new-secret-password',
+    onInputChange() {},
+    onPromptChange() {},
+    onResolve() {},
+    onReject() {}
+  }));
+  assert.match(authPasswordUpdateOutput, /Update Resource Optimiser password/);
+  assert.doesNotMatch(authPasswordUpdateOutput, /new-secret-password/);
   assert.match(renderToString(h(AuthPrompt, {
     prompt: {
       step: 'device',
@@ -349,9 +360,22 @@ test('Ink credential provider resolves auth steps without clack prompts', async 
   resolverRef.current('123456');
   assert.equal(await otpPromise, '123456');
 
+  const passwordUpdatePromise = provider.requestPasswordUpdate();
+  assert.equal(prompts.at(-1).step, 'password-update');
+  assert.equal(prompts.at(-1).field, 'newPassword');
+  assert.match(panels.at(-1).text, /requires a new Resource Optimiser password/);
+  resolverRef.current({
+    newPassword: 'new-secret-password',
+    confirmPassword: 'new-secret-password'
+  });
+  assert.deepEqual(await passwordUpdatePromise, {
+    newPassword: 'new-secret-password',
+    confirmPassword: 'new-secret-password'
+  });
+
   assert.ok(inputValues.every((value) => value === ''));
   assert.ok(selectedIndexes.every((value) => value === 0));
-  assert.doesNotMatch(JSON.stringify(panels), /not-printed|123456/);
+  assert.doesNotMatch(JSON.stringify(panels), /not-printed|123456|new-secret-password/);
 });
 
 test('parseManualCommand supports visible commands and rejects exit aliases', () => {
@@ -410,6 +434,12 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
     type: 'logwork',
     text: 'Monday, 01 Jun 2026'
   });
+  assert.deepEqual(parseManualCommand('/edit-logwork 290364 --hours 0.5 --task-name Updated task'), {
+    type: 'edit_ro_logwork',
+    logworkId: '290364',
+    hours: 0.5,
+    taskName: 'Updated task'
+  });
   assert.deepEqual(parseManualCommand('/auth ro'), {
     type: 'auth',
     target: 'ro'
@@ -466,6 +496,8 @@ test('parseManualCommand supports visible commands and rejects exit aliases', ()
   assert.throws(() => parseManualCommand('/auth both'), /Usage: \/auth/);
   assert.throws(() => parseManualCommand('/status both'), /Usage: \/status/);
   assert.throws(() => parseManualCommand('/preview'), /Unknown command/);
+  assert.throws(() => parseManualCommand('/edit-logwork 290364'), /requires --hours/);
+  assert.throws(() => parseManualCommand('/edit-logwork 290364 --hours 1 --yes'), /always previews and confirms/);
   assert.throws(() => parseManualCommand('/mcp unknown'), /Unknown MCP client/);
   assert.throws(() => parseManualCommand('/unknown'), /Unknown command/);
 });
@@ -523,6 +555,45 @@ test('manual MCP command prompts for client and prints setup', async () => {
   assert.match(printed.join('\n'), /Choose MCP client/);
   assert.match(printed.join('\n'), /MCP setup: Google Antigravity/);
   assert.match(printed.join('\n'), /"mcpServers"/);
+});
+
+test('manual RO edit previews and confirms before applying', async () => {
+  const printed = [];
+  let applied;
+  const editPreview = {
+    previewId: 'ro_edit_safe',
+    status: 'ready',
+    summary: 'RO edit preview: hours 1 -> 0.5.'
+  };
+  await executeManualCommand(
+    parseManualCommand('/edit-logwork 290364 --hours 0.5'),
+    createManualSession(),
+    context({
+      printed,
+      prompts: confirmations([true]),
+      workflows: {
+        previewRoLogworkEdit: async (args) => {
+          assert.deepEqual(args, {
+            logworkId: '290364',
+            hours: 0.5,
+            taskName: undefined
+          });
+          return editPreview;
+        },
+        applyRoLogworkEdit: async (args) => {
+          applied = args;
+          return { summary: 'Updated RO logwork 290364.' };
+        }
+      }
+    })
+  );
+
+  assert.equal(applied.preview, editPreview);
+  assert.equal(applied.confirm, true);
+  assert.deepEqual(printed, [
+    editPreview.summary,
+    'Updated RO logwork 290364.'
+  ]);
 });
 
 test('manual query prints grouped logwork summary', async () => {
