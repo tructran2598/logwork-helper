@@ -352,6 +352,71 @@ test('previewLogworkBatch resolves worklog tasks when names match', async () => 
   assert.equal(preview.entries[1].worklogTaskId, 89);
 });
 
+test('previewLogworkBatch inherits typeOfWork from matched catalog task', async () => {
+  const preview = await previewLogworkBatch({
+    text: weeklyText,
+    fetchProjects: async () => projectsByDate.get('2026-06-01'),
+    fetchWorklogTasks: async () => [
+      {
+        id: 88,
+        name: 'Maintenance mode management and status UI (SCB-213)',
+        project_id: 1,
+        type_of_work: 'correct'
+      },
+      {
+        id: 89,
+        name: 'System page updates',
+        project_id: 1
+      }
+    ]
+  });
+
+  assert.equal(preview.entries[0].typeOfWork, 'correct');
+  assert.equal(preview.entries[1].typeOfWork, undefined);
+});
+
+test('previewLogworkBatch batch typeOfWork overrides catalog defaults', async () => {
+  const preview = await previewLogworkBatch({
+    text: weeklyText,
+    typeOfWork: 'improve',
+    fetchProjects: async () => projectsByDate.get('2026-06-01'),
+    fetchWorklogTasks: async () => [
+      {
+        id: 88,
+        name: 'Maintenance mode management and status UI (SCB-213)',
+        project_id: 1,
+        type_of_work: 'correct'
+      },
+      {
+        id: 89,
+        name: 'System page updates',
+        project_id: 1,
+        type_of_work: 'create'
+      }
+    ]
+  });
+
+  assert.equal(preview.typeOfWork, 'improve');
+  assert.equal(preview.entries[0].typeOfWork, 'correct');
+});
+
+test('applyLogworkBatch prefers batch typeOfWork over entry catalog type', async () => {
+  const preview = buildLogworkBatchPreview({ parsed, projectsByDate });
+  preview.entries[0].worklogTaskId = 88;
+  preview.entries[0].typeOfWork = 'correct';
+  preview.typeOfWork = 'other';
+  const payloads = [];
+  await applyLogworkBatch({
+    batch: preview,
+    confirm: true,
+    submitEntry: async (payload) => {
+      payloads.push(payload);
+      return { dryRun: true };
+    }
+  });
+  assert.equal(payloads[0].typeOfWork, 'other');
+});
+
 test('applyLogworkBatch blocks preview with task_not_found entries', async () => {
   const preview = buildLogworkBatchPreview({ parsed, projectsByDate });
   const unresolvedPreview = await attachWorklogTaskTargets(preview, {

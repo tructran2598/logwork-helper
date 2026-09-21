@@ -72,9 +72,11 @@ MCP uses:
 
 RO resolves each task to a project using the approved preview override, local ticket/keyword mappings, booked projects, and available project memberships. Jira is not written by this flow.
 
-Creating new RO logwork uses `POST /logwork/entries`. The helper resolves each batch task name to a Resource Optimiser worklog task (`GET /logwork/tasks` and `/logwork/tasks/defaults` for the matched project). The task name in your batch text must match the RO worklog task name exactly (case-insensitive). New entries are created with `status: approved` and `type_of_work: other` by default, aligned with the RO manual logwork UI.
+Creating new RO logwork uses `POST /logwork/entries`. The helper resolves each batch task name to a Resource Optimiser worklog task (`GET /logwork/tasks` and `/logwork/tasks/defaults` for the matched project). The task name in your batch text must match the RO worklog task name exactly (case-insensitive). **Task name** (catalog) is not the same as **type of work** (`create`, `correct`, `improve`, `other`) on the log entry.
 
-Optional MCP `preview_logwork_batch` input `typeOfWork` (`create`, `correct`, `improve`, `other`) overrides the batch default for new F03 creates.
+New entries default to `type_of_work: other` when the matched catalog task has no `type_of_work`. When the RO task row defines `type_of_work`, preview copies it onto the entry unless MCP `typeOfWork` overrides the whole batch.
+
+Optional MCP `preview_logwork_batch` input `typeOfWork` applies to every line in the batch and overrides per-task catalog defaults.
 
 ### Staff API surface (F03 vs legacy)
 

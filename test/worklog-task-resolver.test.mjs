@@ -35,6 +35,26 @@ describe('resolveWorklogTask', () => {
     assert.equal(result.needsProjectId, true);
   });
 
+  test('returns catalog type_of_work when the matched task defines it', () => {
+    const result = resolveWorklogTask({
+      taskName: 'Testing Activities',
+      projectId: 643,
+      tasks: [
+        { id: 1, name: 'Testing Activities', project_id: 643, type_of_work: 'create' }
+      ]
+    });
+    assert.equal(result.typeOfWork, 'create');
+  });
+
+  test('omits typeOfWork when catalog field is missing or invalid', () => {
+    const result = resolveWorklogTask({
+      taskName: 'Testing Activities',
+      projectId: 643,
+      tasks: [{ id: 1, name: 'Testing Activities', project_id: 643 }]
+    });
+    assert.equal(result.typeOfWork, undefined);
+  });
+
   test('throws when no task matches and includes suggestions', () => {
     assert.throws(
       () => resolveWorklogTask({
